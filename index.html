@@ -13,12 +13,15 @@
     #score { position: absolute; top: 12px; left: 12px; font: bold 24px/1 sans-serif; color: #fff; text-shadow: 0 1px 3px #000; }
     #timer { position: absolute; top: 12px; right: 12px; font: bold 24px/1 sans-serif; color: #ffeb3b; text-shadow: 0 1px 3px #000; }
     #combo { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font: bold 20px/1 sans-serif; color: #ff9800; text-shadow: 0 1px 3px #000; }
-    #startBtn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 16px 32px; font: bold 20px sans-serif; background: #4caf50; color: #fff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    #startBtn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 36px; min-height: 48px; min-width: 200px; font: bold 20px sans-serif; background: #4caf50; color: #fff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); -webkit-user-select: none; user-select: none; }
     #startBtn:active { transform: translate(-50%, -50%) scale(0.98); }
     #gameOver { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); text-align: center; display: none; }
     #gameOver.show { display: block; }
     #finalScore { font: bold 28px sans-serif; color: #fff; text-shadow: 0 2px 4px #000; margin-bottom: 12px; }
     #restartBtn { padding: 14px 28px; font: bold 18px sans-serif; background: #2196f3; color: #fff; border: none; border-radius: 10px; cursor: pointer; }
+    #instructions { position: absolute; left: 50%; transform: translateX(-50%); top: 58%; width: 90%; max-width: 340px; text-align: center; font: 14px/1.4 sans-serif; color: rgba(255,255,255,0.95); text-shadow: 0 1px 2px #000; pointer-events: none; }
+    #instructions.hidden { display: none; }
+    #instructions strong { color: #ffeb3b; }
   </style>
 </head>
 <body>
@@ -28,6 +31,22 @@
     <div id="timer">30</div>
     <div id="combo"></div>
     <button id="startBtn">Start (Allow Motion)</button>
+    <div id="instructions">
+      <div id="instructionsMobile" style="display: none;">
+        <strong>How to play</strong><br>
+        Tilt phone left/right to aim.<br>
+        Tap screen to fire the stream.<br>
+        Hit orange balls (+10), toilet bowl (+20).<br>
+        Avoid the duck (−10). Golden duck = +100.
+      </div>
+      <div id="instructionsDesktop" style="display: none;">
+        <strong>How to play</strong><br>
+        Use mouse left/right movement to aim (or A/D keys).<br>
+        Click (or hold) to fire the stream.<br>
+        Hit orange balls (+10), toilet bowl (+20).<br>
+        Avoid the duck (−10). Golden duck = +100.
+      </div>
+    </div>
     <div id="gameOver">
       <div id="finalScore">Score: 0</div>
       <button id="restartBtn">Play Again</button>
@@ -80,17 +99,28 @@
 
   // ========== IOS DEVICE ORIENTATION PERMISSION ==========
   // Required for iOS 13+: requestPermission must be called from a user gesture (Start button).
+  // Wrapped in try-catch; timeout ensures game starts even if permission dialog hangs.
   function requestMotionPermission(cb) {
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(function(permission) {
-          motionPermissionGranted = permission === 'granted';
-          if (cb) cb(motionPermissionGranted);
-        })
-        .catch(function() { if (cb) cb(false); });
-    } else {
-      motionPermissionGranted = true;
-      if (cb) cb(true);
+    var done = false;
+    function finish(granted) {
+      if (done) return;
+      done = true;
+      motionPermissionGranted = granted;
+      if (cb) cb(granted);
+    }
+    setTimeout(function() { finish(false); }, 4000);
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+          .then(function(permission) {
+            finish(permission === 'granted');
+          })
+          .catch(function() { finish(false); });
+      } else {
+        finish(true);
+      }
+    } catch (e) {
+      finish(false);
     }
   }
 
@@ -177,8 +207,10 @@
   // Balls bounce off edges; +10 hit, -5 miss; radius can shrink over time (difficulty).
   const TARGET_BASE_R = 20;
   const TARGET_MIN_R = 8;
+  const MAX_TARGETS = 12;
 
   function spawnTarget() {
+    if (targets.length >= MAX_TARGETS) return;
     const r = Math.max(TARGET_MIN_R, TARGET_BASE_R * shrinkFactor);
     targets.push({
       x: r + Math.random() * (W - 2 * r),
@@ -427,6 +459,8 @@
   // --- INPUT ---
   let orientationHandler = null;
 
+  var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
   function bindOrientation() {
     orientationHandler = function(e) {
       if (state !== 'playing' || e.gamma == null) return;
@@ -440,6 +474,20 @@
     if (orientationHandler) window.removeEventListener('deviceorientation', orientationHandler);
     orientationHandler = null;
   }
+
+  // Desktop: mouse or A/D keys control aim
+  canvas.addEventListener('mousemove', function(e) {
+    if (state !== 'playing' || isTouchDevice) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const t = (x - rect.width / 2) / (rect.width / 2);
+    aimAngle = -Math.PI / 2 + Math.max(-0.8, Math.min(0.8, t)) * Math.PI * 0.5;
+  });
+  window.addEventListener('keydown', function(e) {
+    if (state !== 'playing' || isTouchDevice) return;
+    if (e.key === 'a' || e.key === 'A') aimAngle = Math.max(-Math.PI / 2 - 0.8, aimAngle - 0.06);
+    if (e.key === 'd' || e.key === 'D') aimAngle = Math.min(-Math.PI / 2 + 0.8, aimAngle + 0.06);
+  });
 
   canvas.addEventListener('touchstart', function(e) {
     e.preventDefault();
@@ -526,7 +574,8 @@
     trySpawnTurboPickup();
     updateTurboPickup(dt);
 
-    spawnAccum += dt * (0.5 + (30 - timeLeft) / 30 * 1.5);
+    // Spawn one ball roughly every 2s at start, every ~1.2s as timer runs down (dt in ms).
+    spawnAccum += dt / (2200 - (30 - timeLeft) * 35);
     while (spawnAccum > 1) {
       spawnAccum -= 1;
       spawnTarget();
@@ -621,7 +670,7 @@
     }
 
     streamParticles.forEach(function(p) {
-      ctx.fillStyle = 'rgba(100,200,255,' + (p.life / p.maxLife));
+      ctx.fillStyle = 'rgba(100,200,255,' + (p.life / p.maxLife) + ')';
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
@@ -693,12 +742,14 @@
   }
 
   function startGame() {
+    try { ensureAudio(); } catch (e) {}
     requestMotionPermission(function(ok) {
       motionPermissionGranted = ok;
       if (!ok) {
-        alert('Motion access helps aim. You can still play with default aim.');
+        try { alert('Motion access helps aim. You can still play with default aim.'); } catch (a) {}
       }
       document.getElementById('startBtn').style.display = 'none';
+      document.getElementById('instructions').classList.add('hidden');
       state = 'playing';
       score = 0;
       timeLeft = 30;
@@ -707,6 +758,7 @@
       targets = [];
       duck = null;
       goldenDuck = null;
+      turboPickup = null;
       streamParticles = [];
       comboPopups = [];
       spawnAccum = 0;
@@ -723,6 +775,8 @@
       lastTime = performance.now();
       requestAnimationFrame(tick);
 
+      document.getElementById('timer').textContent = timeLeft;
+      document.getElementById('score').textContent = 'Score: ' + score;
       timerInterval = setInterval(function() {
         timeLeft--;
         document.getElementById('timer').textContent = timeLeft;
@@ -746,19 +800,43 @@
     document.getElementById('combo').textContent = '';
   }
 
-  document.getElementById('startBtn').addEventListener('click', function() {
-    ensureAudio();
+  // Start button: support both click and touch so it works reliably on phones.
+  var startBtn = document.getElementById('startBtn');
+  function onStart() {
+    if (state === 'playing') return;
     startGame();
-  });
+  }
+  startBtn.addEventListener('click', function(e) { e.preventDefault(); onStart(); });
+  startBtn.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    onStart();
+  }, { passive: false });
 
-  document.getElementById('restartBtn').addEventListener('click', function() {
+  function showStartScreen() {
     document.getElementById('gameOver').classList.remove('show');
     document.getElementById('startBtn').style.display = 'block';
+    document.getElementById('instructions').classList.remove('hidden');
     document.getElementById('timer').textContent = '30';
     document.getElementById('score').textContent = 'Score: 0';
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = null;
+    state = 'idle';
+  }
+  document.getElementById('restartBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    showStartScreen();
   });
+  document.getElementById('restartBtn').addEventListener('touchend', function(e) {
+    e.preventDefault();
+    showStartScreen();
+  }, { passive: false });
+
+  // Show mobile or desktop instructions on load
+  (function() {
+    var mobileEl = document.getElementById('instructionsMobile');
+    var desktopEl = document.getElementById('instructionsDesktop');
+    if (isTouchDevice) mobileEl.style.display = 'block'; else desktopEl.style.display = 'block';
+  })();
 
 })();
   </script>
