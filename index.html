@@ -23,8 +23,11 @@
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       color: var(--text);
     }
+    html{ height: 100%; }
     body{
       margin:0;
+      min-height: 100vh;
+      min-height: 100%;
       background:
         radial-gradient(1200px 600px at 30% 10%, rgba(123,223,242,.08), transparent 60%),
         radial-gradient(900px 500px at 80% 30%, rgba(179,136,255,.08), transparent 55%),
@@ -32,7 +35,18 @@
         var(--bg);
       overflow-x:hidden;
     }
-    .wrap{ max-width: 1200px; margin:0 auto; padding: 16px; }
+    .wrap{
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: none;
+      min-height: 100vh;
+      min-height: 100%;
+      padding: 16px 20px 220px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
     header{
       display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
       margin-bottom: 12px;
@@ -74,10 +88,37 @@
       display:grid;
       grid-template-columns: 1.05fr 0.95fr;
       gap: 14px;
+      flex: 1;
+      min-height: 0;
     }
     @media(max-width: 980px){
       .grid{ grid-template-columns: 1fr; }
     }
+    .grid .card{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .grid .card > .cardTitle,
+    .grid .card > .tabs{ flex-shrink: 0; }
+    .grid .card > #tab_machines,
+    .grid .card > #tab_tools,
+    .grid .card > #tab_achievements,
+    .grid .card > #tab_log{
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .grid .card > #tab_machines,
+    .grid .card > #tab_tools{ overflow: auto; }
+    .grid .card > #tab_achievements{ overflow: auto; }
+    .grid .card > #tab_log{
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .grid .card > #tab_log .log{ flex: 1; min-height: 0; overflow: auto; }
+    .grid .card:first-child .orbWrap{ flex: 1; min-height: 0; }
     .card{
       background: rgba(15,22,33,.85);
       border: 1px solid var(--border);
@@ -150,6 +191,28 @@
       touch-action: manipulation;
     }
     .orb:active{ transform: scale(.985); }
+    .orbHeatOverlay{
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,120,50,.5), rgba(200,60,20,.35) 40%, transparent 65%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .12s ease;
+    }
+    .orb.orbHolding .orbGlow{
+      transition: filter .15s ease, opacity .15s ease;
+    }
+    .orbExplode{
+      animation: orbExplode .5s ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes orbExplode{
+      0% { filter: brightness(1.5); box-shadow: 0 0 0 0 rgba(255,80,30,.8), 0 25px 60px rgba(0,0,0,.6); }
+      30% { filter: brightness(2.5); box-shadow: 0 0 60px 20px rgba(255,100,40,.9), 0 25px 60px rgba(0,0,0,.6); }
+      100% { filter: brightness(0.7); box-shadow: 0 0 0 0 transparent, 0 25px 60px rgba(0,0,0,.6); }
+    }
     .orbGlow{
       position:absolute; inset:-30%;
       background: conic-gradient(from 0deg,
@@ -268,8 +331,8 @@
 
     /* Log */
     .log{
-      height: 230px;
-      overflow:auto;
+      min-height: 200px;
+      overflow: auto;
       padding-right: 6px;
       scrollbar-color: #2a4158 #0c121b;
     }
@@ -347,10 +410,230 @@
       display:none;
     }
     .eventBanner b{ color: var(--gold); }
+
+    /* Live starfield */
+    .starfield{
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .starfield .star{
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(255,255,255,.6);
+      animation: twinkle 4s ease-in-out infinite;
+    }
+    @keyframes twinkle{
+      0%, 100% { opacity: .25; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+    .shooting-star{
+      position: absolute;
+      left: -15%;
+      top: -5%;
+      width: 120px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent);
+      border-radius: 2px;
+      transform: rotate(-55deg);
+      transform-origin: left center;
+      opacity: 0;
+      box-shadow: 0 0 12px rgba(255,255,255,.5);
+    }
+    .shooting-star.s1{ animation: shoot 1.1s linear infinite; animation-delay: 0s; }
+    .shooting-star.s2{ animation: shoot 1.1s linear infinite; animation-delay: 5.2s; }
+    .shooting-star.s3{ animation: shoot 1.1s linear infinite; animation-delay: 10.4s; }
+    @keyframes shoot{
+      0% { left: -15%; top: -5%; opacity: 0; }
+      8% { opacity: 1; }
+      92% { opacity: 1; }
+      100% { left: 115%; top: 105%; opacity: 0; }
+    }
+
+    /* Ship arena */
+    .shipArena{
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 200px;
+      z-index: 5;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .shipArenaBg{
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, transparent 0%, rgba(10,20,40,.4) 30%, rgba(15,25,50,.85) 70%),
+        radial-gradient(ellipse 120% 80% at 50% 100%, rgba(123,223,242,.12), transparent 50%),
+        radial-gradient(ellipse 80% 60% at 20% 100%, rgba(179,136,255,.1), transparent 45%),
+        radial-gradient(ellipse 80% 60% at 80% 100%, rgba(255,204,102,.08), transparent 45%);
+    }
+    .shipViewport{
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .shipArenaHud{
+      position: absolute;
+      bottom: 8px;
+      left: 12px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .shipHudLabel{ font-weight: 900; color: var(--cyan); }
+    .shipHudStat{ opacity: .9; }
+
+    .ship{
+      position: absolute;
+      left: 50%;
+      bottom: 42px;
+      width: 48px;
+      height: 32px;
+      margin-left: -24px;
+      transform-origin: center bottom;
+      transition: left .08s ease-out, bottom .06s ease-out;
+      z-index: 10;
+    }
+    .shipBody{
+      position: absolute;
+      left: 8px;
+      bottom: 0;
+      width: 32px;
+      height: 22px;
+      background: linear-gradient(180deg, #3a6a8a 0%, #1e3a52 50%, #0f2035 100%);
+      border-radius: 4px 4px 12px 12px;
+      border: 1px solid rgba(123,223,242,.35);
+      box-shadow: 0 0 20px rgba(123,223,242,.2), inset 0 2px 0 rgba(255,255,255,.15);
+    }
+    .shipNose{
+      position: absolute;
+      left: 0;
+      bottom: 6px;
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 0 0 10px 16px;
+      border-color: transparent transparent rgba(123,223,242,.6) transparent;
+      filter: drop-shadow(0 0 6px rgba(123,223,242,.5));
+    }
+    .shipEngine{
+      position: absolute;
+      right: 0;
+      bottom: 4px;
+      width: 14px;
+      height: 14px;
+      background: radial-gradient(circle, #7bdff2 0%, #2a8a9e 40%, transparent 70%);
+      border-radius: 50%;
+      animation: enginePulse 0.4s ease-in-out infinite;
+    }
+    @keyframes enginePulse{ 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .7; transform: scale(1.1); } }
+    .shipWing{ position: absolute; bottom: 2px; width: 12px; height: 10px; background: linear-gradient(135deg, rgba(179,136,255,.5), rgba(100,60,180,.6)); border-radius: 2px; border: 1px solid rgba(179,136,255,.4); }
+    .shipWingL{ left: 2px; transform: skewY(-8deg); }
+    .shipWingR{ right: 2px; transform: skewY(8deg); }
+    .shipWing[data-part].unlocked{ opacity: 1; }
+    .shipWing[data-part]:not(.unlocked){ opacity: 0; pointer-events: none; }
+    .shipComboGlow{ position: absolute; left: 50%; bottom: 8px; margin-left: -10px; width: 20px; height: 8px; background: radial-gradient(ellipse, rgba(179,136,255,.4), transparent 70%); border-radius: 50%; animation: enginePulse 0.8s ease-in-out infinite; }
+    .shipComboGlow[data-part].unlocked{ opacity: 1; }
+    .shipComboGlow[data-part]:not(.unlocked){ opacity: 0; }
+    .shipCannon{ position: absolute; left: -4px; bottom: 10px; width: 6px; height: 6px; background: radial-gradient(circle, #ffcc66, #cc8800); border-radius: 50%; box-shadow: 0 0 10px #ffcc66; }
+    .shipCannon[data-part].unlocked{ opacity: 1; }
+    .shipCannon[data-part]:not(.unlocked){ opacity: 0; }
+    .shipPulse{ position: absolute; right: 12px; bottom: 2px; width: 8px; height: 8px; background: rgba(93,211,158,.6); border-radius: 50%; animation: enginePulse 0.6s ease-in-out infinite; }
+    .shipPulse[data-part].unlocked{ opacity: 1; }
+    .shipPulse[data-part]:not(.unlocked){ opacity: 0; }
+    .shipStripe{ position: absolute; left: 12px; bottom: 14px; width: 18px; height: 3px; background: linear-gradient(90deg, transparent, rgba(93,211,158,.7), transparent); border-radius: 2px; }
+    .shipStripe[data-part].unlocked{ opacity: 1; }
+    .shipStripe[data-part]:not(.unlocked){ opacity: 0; }
+    .shipCapacitor{ position: absolute; right: 4px; top: 2px; width: 6px; height: 6px; background: rgba(179,136,255,.8); border-radius: 50%; box-shadow: 0 0 8px rgba(179,136,255,.6); animation: enginePulse 1s ease-in-out infinite; }
+    .shipCapacitor[data-part].unlocked{ opacity: 1; }
+    .shipCapacitor[data-part]:not(.unlocked){ opacity: 0; }
+    .shipWingExtra{ position: absolute; left: 50%; margin-left: -18px; bottom: -4px; width: 36px; height: 6px; background: linear-gradient(90deg, transparent, rgba(93,211,158,.4), transparent); border-radius: 2px; }
+    .shipWingExtra[data-part].unlocked{ opacity: 1; }
+    .shipWingExtra[data-part]:not(.unlocked){ opacity: 0; }
+    .shipDoubleEngine{ position: absolute; right: -2px; bottom: 6px; width: 8px; height: 10px; background: radial-gradient(ellipse, rgba(255,204,102,.6), transparent 70%); border-radius: 50%; animation: enginePulse 0.25s ease-in-out infinite; }
+    .shipDoubleEngine[data-part].unlocked{ opacity: 1; }
+    .shipDoubleEngine[data-part]:not(.unlocked){ opacity: 0; }
+    .shipRadar{ position: absolute; left: 50%; top: -6px; margin-left: -4px; width: 8px; height: 6px; background: linear-gradient(180deg, rgba(123,223,242,.6), transparent); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+    .shipRadar[data-part].unlocked{ opacity: 1; }
+    .shipRadar[data-part]:not(.unlocked){ opacity: 0; }
+    .shipDroneWing{ position: absolute; left: -6px; bottom: 12px; width: 8px; height: 6px; background: rgba(123,223,242,.4); border-radius: 2px; }
+    .shipDroneWing[data-part].unlocked{ opacity: 1; }
+    .shipDroneWing[data-part]:not(.unlocked){ opacity: 0; }
+    .shipMiningBeam{ position: absolute; left: -8px; bottom: 8px; width: 4px; height: 8px; background: linear-gradient(90deg, #ffcc66, transparent); border-radius: 2px; box-shadow: 0 0 8px #ffcc66; animation: enginePulse 0.3s ease-in-out infinite; }
+    .shipMiningBeam[data-part].unlocked{ opacity: 1; }
+    .shipMiningBeam[data-part]:not(.unlocked){ opacity: 0; }
+    .shipPlates{ position: absolute; inset: -2px; border: 2px solid rgba(255,204,102,.25); border-radius: 6px 6px 14px 14px; pointer-events: none; }
+    .shipPlates[data-part].unlocked{ opacity: 1; }
+    .shipPlates[data-part]:not(.unlocked){ opacity: 0; }
+    .shipDish{ position: absolute; left: 50%; top: -12px; margin-left: -6px; width: 12px; height: 8px; background: radial-gradient(ellipse, rgba(179,136,255,.5), transparent 70%); border-radius: 50%; }
+    .shipDish[data-part].unlocked{ opacity: 1; }
+    .shipDish[data-part]:not(.unlocked){ opacity: 0; }
+    .shipWarpTrail{ position: absolute; right: -20px; bottom: 8px; width: 24px; height: 4px; background: linear-gradient(90deg, rgba(123,223,242,.5), transparent); border-radius: 2px; filter: blur(2px); animation: enginePulse 0.5s ease-in-out infinite; }
+    .shipWarpTrail[data-part].unlocked{ opacity: 1; }
+    .shipWarpTrail[data-part]:not(.unlocked){ opacity: 0; }
+
+    .shipProjectiles, .shipObstacles, .shipCollectibles{ position: absolute; inset: 0; pointer-events: none; }
+    .proj{ position: absolute; width: 6px; height: 4px; background: linear-gradient(90deg, #7bdff2, transparent); border-radius: 2px; box-shadow: 0 0 8px #7bdff2; }
+    .proj.gold{ background: linear-gradient(90deg, #ffcc66, transparent); box-shadow: 0 0 8px #ffcc66; }
+    .proj.purple{ background: linear-gradient(90deg, #b388ff, transparent); box-shadow: 0 0 8px #b388ff; }
+    .obstacle{ position: absolute; border-radius: 50%; background: linear-gradient(135deg, #2a3544, #1a2230); border: 1px solid #3a4555; box-shadow: inset 0 0 8px rgba(0,0,0,.5); }
+    .obstacle.asteroid{ width: 24px; height: 24px; }
+    .obstacle.junk{ width: 16px; height: 16px; background: linear-gradient(135deg, #3a3a4a, #2a2a35); }
+    .collectible{ position: absolute; width: 12px; height: 12px; background: radial-gradient(circle at 30% 30%, rgba(255,204,102,.9), rgba(200,150,50,.5)); border-radius: 50%; box-shadow: 0 0 12px rgba(255,204,102,.6); animation: collectibleFloat 2s ease-in-out infinite; }
+    @keyframes collectibleFloat{ 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    .shipHit{ animation: shipHit 0.3s ease-out; }
+    @keyframes shipHit{ 0% { filter: brightness(2); } 50% { filter: brightness(0.5); } 100% { filter: brightness(1); } }
   </style>
 </head>
 
 <body>
+  <div class="starfield" aria-hidden="true">
+    <div class="star" style="left:5%;top:12%;animation-delay:0s"></div>
+    <div class="star" style="left:12%;top:8%;animation-delay:.5s"></div>
+    <div class="star" style="left:18%;top:22%;animation-delay:1s"></div>
+    <div class="star" style="left:25%;top:5%;animation-delay:1.8s"></div>
+    <div class="star" style="left:32%;top:18%;animation-delay:.2s"></div>
+    <div class="star" style="left:42%;top:12%;animation-delay:2.5s"></div>
+    <div class="star" style="left:48%;top:28%;animation-delay:.8s"></div>
+    <div class="star" style="left:55%;top:7%;animation-delay:3s"></div>
+    <div class="star" style="left:62%;top:24%;animation-delay:1.5s"></div>
+    <div class="star" style="left:72%;top:14%;animation-delay:2s"></div>
+    <div class="star" style="left:78%;top:6%;animation-delay:.3s"></div>
+    <div class="star" style="left:85%;top:20%;animation-delay:2.8s"></div>
+    <div class="star" style="left:92%;top:11%;animation-delay:1.2s"></div>
+    <div class="star" style="left:8%;top:35%;animation-delay:3.2s"></div>
+    <div class="star" style="left:15%;top:42%;animation-delay:.6s"></div>
+    <div class="star" style="left:22%;top:38%;animation-delay:2.2s"></div>
+    <div class="star" style="left:38%;top:45%;animation-delay:1.8s"></div>
+    <div class="star" style="left:52%;top:52%;animation-delay:.4s"></div>
+    <div class="star" style="left:65%;top:48%;animation-delay:2.6s"></div>
+    <div class="star" style="left:82%;top:55%;animation-delay:1.1s"></div>
+    <div class="star" style="left:88%;top:42%;animation-delay:3.5s"></div>
+    <div class="star" style="left:3%;top:62%;animation-delay:2.4s"></div>
+    <div class="star" style="left:28%;top:68%;animation-delay:.9s"></div>
+    <div class="star" style="left:45%;top:72%;animation-delay:3.8s"></div>
+    <div class="star" style="left:58%;top:65%;animation-delay:1.6s"></div>
+    <div class="star" style="left:75%;top:70%;animation-delay:2.9s"></div>
+    <div class="star" style="left:95%;top:58%;animation-delay:.7s"></div>
+    <div class="star" style="left:10%;top:78%;animation-delay:3.3s"></div>
+    <div class="star" style="left:35%;top:82%;animation-delay:1.4s"></div>
+    <div class="star" style="left:68%;top:88%;animation-delay:2.1s"></div>
+    <div class="star" style="left:90%;top:75%;animation-delay:.1s"></div>
+    <div class="shooting-star s1"></div>
+    <div class="shooting-star s2"></div>
+    <div class="shooting-star s3"></div>
+  </div>
+
   <div class="wrap">
     <header>
       <div>
@@ -372,7 +655,7 @@
       <div class="card">
         <div class="cardTitle">
           <h2>Forge</h2>
-          <div class="small">Hold-click works. Starburst triggers at 100% Overcharge.</div>
+          <div class="small">Hold-click works. Starburst at 100% Overcharge. Hold too long and the orb overheats—you lose half your Stardust!</div>
         </div>
 
         <div class="bigNumber" id="bigDust">0 Stardust</div>
@@ -411,11 +694,12 @@
           <div class="orbArea">
             <div class="orb" id="orb">
               <div class="orbGlow"></div>
+              <div class="orbHeatOverlay" id="orbHeatOverlay"></div>
               <div class="orbCore"></div>
               <div class="orbText">
                 <div class="label">Click to forge</div>
                 <div class="tap">STARDUST</div>
-                <div class="hint">Overcharge ➜ Starburst bonus</div>
+                <div class="hint">Overcharge ➜ Starburst • Hold too long ➜ overheat!</div>
               </div>
             </div>
           </div>
@@ -459,6 +743,41 @@
           <div class="log" id="log"></div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Ship arena: automated mini-game at bottom -->
+  <div class="shipArena" id="shipArena">
+    <div class="shipArenaBg"></div>
+    <div class="shipViewport" id="shipViewport">
+      <div class="ship" id="ship">
+        <div class="shipBody"></div>
+        <div class="shipNose"></div>
+        <div class="shipEngine"></div>
+        <div class="shipWing shipWingL" data-part="gloves"></div>
+        <div class="shipWing shipWingR" data-part="gloves"></div>
+        <div class="shipComboGlow" data-part="tapRhythm"></div>
+        <div class="shipCannon" data-part="lens"></div>
+        <div class="shipPulse" data-part="autopulse"></div>
+        <div class="shipStripe" data-part="efficiency"></div>
+        <div class="shipCapacitor" data-part="boostCool"></div>
+        <div class="shipWingExtra" data-part="union"></div>
+        <div class="shipDoubleEngine" data-part="compressor"></div>
+        <div class="shipRadar" data-part="blueprints"></div>
+        <div class="shipDroneWing" data-part="drone"></div>
+        <div class="shipMiningBeam" data-part="mine"></div>
+        <div class="shipPlates" data-part="foundry"></div>
+        <div class="shipDish" data-part="observatory"></div>
+        <div class="shipWarpTrail" data-part="rift"></div>
+      </div>
+      <div class="shipProjectiles" id="shipProjectiles"></div>
+      <div class="shipObstacles" id="shipObstacles"></div>
+      <div class="shipCollectibles" id="shipCollectibles"></div>
+    </div>
+    <div class="shipArenaHud">
+      <span class="shipHudLabel">🛸 Scout</span>
+      <span class="shipHudStat" id="shipHudSpeed">Speed: 1×</span>
+      <span class="shipHudStat" id="shipHudParts">Parts: 0</span>
     </div>
   </div>
 
@@ -790,7 +1109,7 @@
     $("tab_machines").style.display = tab === "machines" ? "flex" : "none";
     $("tab_tools").style.display = tab === "tools" ? "flex" : "none";
     $("tab_achievements").style.display = tab === "achievements" ? "block" : "none";
-    $("tab_log").style.display = tab === "log" ? "block" : "none";
+    $("tab_log").style.display = tab === "log" ? "flex" : "none";
   }
 
   // ---------- Achievements ----------
@@ -837,6 +1156,7 @@
     addLog("gold", "Tool", `Unlocked: ${t.name}`);
     toast("Tool unlocked", t.name);
     saveDebounced();
+    updateShipVisual();
     return true;
   }
 
@@ -853,6 +1173,7 @@
     addLog("good", "Machine", `Built 1× ${m.name}.`);
     toast("Built", m.name);
     saveDebounced();
+    updateShipVisual();
     return true;
   }
 
@@ -923,17 +1244,81 @@
   }
 
   const orb = $("orb");
-  orb.addEventListener("pointerdown", (e) => {
-    orb.setPointerCapture?.(e.pointerId);
-    doClick(e.clientX, e.clientY);
-    startHold();
-  });
+  const orbHeatOverlay = $("orbHeatOverlay");
+  const EXPLODE_AFTER_MS = 3500;
 
   let hold = false;
   let holdTimer = null;
+  let holdStartTime = 0;
+  let holdAnimationId = null;
+  let capturedPointerId = null;
+
+  function applyHeat(heat){
+    orb.style.setProperty("--orbHeat", heat);
+    orbHeatOverlay.style.opacity = heat;
+    const t = (now() - holdStartTime) / 80;
+    const shake = 5 * heat;
+    orb.style.transform = `translate(${Math.sin(t) * shake}px, ${Math.cos(t * 1.3) * shake}px)`;
+    const glow = orb.querySelector(".orbGlow");
+    if (glow) glow.style.filter = `blur(18px) hue-rotate(${-60 + heat * 80}deg)`;
+  }
+
+  function cancelHold(){
+    hold = false;
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (holdAnimationId != null) { cancelAnimationFrame(holdAnimationId); holdAnimationId = null; }
+    orb.classList.remove("orbHolding", "orbExplode");
+    orbHeatOverlay.style.opacity = 0;
+    orb.style.transform = "";
+    orb.style.removeProperty("--orbHeat");
+    const glow = orb.querySelector(".orbGlow");
+    if (glow) glow.style.filter = "";
+    if (capturedPointerId != null && orb.releasePointerCapture) {
+      try { orb.releasePointerCapture(capturedPointerId); } catch(_){}
+      capturedPointerId = null;
+    }
+  }
+
+  function explode(){
+    const lost = S.dust * 0.5;
+    S.dust *= 0.5;
+    addLog("bad", "Overheat!", `The orb exploded. You lost ${fmt(lost)} Stardust.`);
+    toast("Overheat!", "The orb exploded! Half your Stardust lost.");
+    saveDebounced();
+    orb.classList.add("orbExplode");
+    orb.classList.remove("orbHolding");
+    if (holdAnimationId != null) { cancelAnimationFrame(holdAnimationId); holdAnimationId = null; }
+    hold = false;
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    orbHeatOverlay.style.opacity = 0;
+    orb.style.transform = "";
+    orb.style.removeProperty("--orbHeat");
+    const glow = orb.querySelector(".orbGlow");
+    if (glow) glow.style.filter = "";
+    if (capturedPointerId != null && orb.releasePointerCapture) {
+      try { orb.releasePointerCapture(capturedPointerId); } catch(_){}
+      capturedPointerId = null;
+    }
+    setTimeout(() => orb.classList.remove("orbExplode"), 500);
+  }
+
+  function heatUpdate(){
+    if (!hold) return;
+    const duration = now() - holdStartTime;
+    const heat = Math.min(1, duration / EXPLODE_AFTER_MS);
+    orb.classList.add("orbHolding");
+    applyHeat(heat);
+    if (heat >= 1){
+      explode();
+      return;
+    }
+    holdAnimationId = requestAnimationFrame(heatUpdate);
+  }
 
   function startHold(){
     hold = true;
+    holdStartTime = now();
+    holdAnimationId = requestAnimationFrame(heatUpdate);
     const repeat = () => {
       if (!hold) return;
       const r = orb.getBoundingClientRect();
@@ -943,9 +1328,15 @@
     holdTimer = setTimeout(repeat, 220);
   }
 
+  orb.addEventListener("pointerdown", (e) => {
+    capturedPointerId = e.pointerId;
+    orb.setPointerCapture?.(e.pointerId);
+    doClick(e.clientX, e.clientY);
+    startHold();
+  });
+
   window.addEventListener("pointerup", () => {
-    hold = false;
-    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (hold) cancelHold();
   });
 
   // ---------- Starboost ----------
@@ -999,6 +1390,183 @@
       S.cosmicEvent = null;
       $("eventBanner").style.display = "none";
     }
+  }
+
+  // ---------- Ship Arena (automated mini-game) ----------
+  const ship = $("ship");
+  const shipViewport = $("shipViewport");
+  const shipProjectiles = $("shipProjectiles");
+  const shipObstacles = $("shipObstacles");
+  const shipCollectibles = $("shipCollectibles");
+
+  const SHIP_PART_IDS = ["gloves","tapRhythm","lens","autopulse","efficiency","boostCool","union","compressor","blueprints","drone","mine","foundry","observatory","rift"];
+  function updateShipVisual(){
+    if (!ship) return;
+    ship.querySelectorAll("[data-part]").forEach(el => {
+      const id = el.getAttribute("data-part");
+      const unlocked = hasTool(id) || (S.machinesOwned && (S.machinesOwned[id] || 0) > 0);
+      el.classList.toggle("unlocked", !!unlocked);
+    });
+    const partsCount = SHIP_PART_IDS.filter(id => hasTool(id) || (S.machinesOwned && (S.machinesOwned[id] || 0) > 0)).length;
+    const hudParts = $("shipHudParts");
+    if (hudParts) hudParts.textContent = `Parts: ${partsCount}`;
+  }
+
+  let shipX = 50;           // % of viewport width
+  let shipDir = 1;         // 1 = right, -1 = left
+  let shipLastShot = 0;
+  let shipHitUntil = 0;
+  const projectiles = [];
+  const obstacles = [];
+  const collectibles = [];
+
+  function shipSpeedMult(){
+    const dust = S.dust || 0;
+    return 1 + Math.min(3, Math.log10(dust + 1) * 0.8);
+  }
+  function shipFireRateMs(){
+    let ms = 500;
+    if (hasTool("compressor")) ms *= 0.7;
+    if (hasTool("lens")) ms *= 0.9;
+    const dust = S.dust || 0;
+    ms /= (1 + Math.min(2, Math.log10(dust + 1) * 0.3));
+    return Math.max(120, ms);
+  }
+
+  function shipTick(dt){
+    if (!shipViewport || !ship) return;
+    const vw = shipViewport.offsetWidth;
+    const vh = shipViewport.offsetHeight;
+    if (vw <= 0) return;
+
+    const speed = shipSpeedMult() * 25 * dt;
+    shipX += shipDir * speed;
+    if (shipX >= 92) { shipX = 92; shipDir = -1; }
+    if (shipX <= 8) { shipX = 8; shipDir = 1; }
+    ship.style.left = shipX + "%";
+    ship.style.marginLeft = "-24px";
+    if (shipHitUntil > now()) ship.classList.add("shipHit");
+    else ship.classList.remove("shipHit");
+
+    const shipPx = (shipX / 100) * vw;
+    const shipLeft = shipPx - 24;
+    const shipRight = shipPx + 24;
+    const shipTop = vh - 74;
+    const shipBottom = vh - 42;
+
+    // Spawn obstacles (asteroids / junk)
+    const obstacleRate = 0.15 + Math.min(0.25, (S.totalDust || 0) / 50000) * dt;
+    if (Math.random() < obstacleRate){
+      const obs = document.createElement("div");
+      const isJunk = Math.random() < 0.4;
+      obs.className = "obstacle " + (isJunk ? "junk" : "asteroid");
+      obs.dataset.x = vw + 30;
+      obs.dataset.y = 30 + Math.random() * (vh - 100);
+      obs.dataset.vx = -80 - Math.random() * 120;
+      obs.dataset.hp = hasTool("lens") ? 0.6 : 1;
+      obs.style.left = obs.dataset.x + "px";
+      obs.style.top = obs.dataset.y + "px";
+      shipObstacles.appendChild(obs);
+      obstacles.push(obs);
+    }
+
+    // Spawn collectibles (stardust crystals)
+    const collectRate = 0.03 + Math.min(0.04, (S.dust || 0) / 10000) * dt;
+    if (Math.random() < collectRate){
+      const col = document.createElement("div");
+      col.className = "collectible";
+      col.dataset.x = Math.random() < 0.5 ? -20 : vw + 20;
+      col.dataset.y = 40 + Math.random() * (vh - 80);
+      col.dataset.vx = col.dataset.x < 0 ? 60 : -60;
+      col.style.left = col.dataset.x + "px";
+      col.style.top = col.dataset.y + "px";
+      shipCollectibles.appendChild(col);
+      collectibles.push(col);
+    }
+
+    // Auto-shoot at nearest obstacle to the left of center
+    const nearest = obstacles.filter(o => parseFloat(o.dataset.x) < vw * 0.85).sort((a, b) => parseFloat(a.dataset.x) - parseFloat(b.dataset.x))[0];
+    if (nearest && now() - shipLastShot >= shipFireRateMs()){
+      shipLastShot = now();
+      const proj = document.createElement("div");
+      proj.className = "proj" + (hasTool("lens") ? " gold" : hasTool("mine") ? " purple" : "");
+      proj.dataset.x = shipRight;
+      proj.dataset.y = shipTop + 20;
+      proj.dataset.vx = 420;
+      proj.dataset.targetId = nearest.dataset.id || (nearest.dataset.id = "o" + Math.random());
+      nearest.dataset.id = proj.dataset.targetId;
+      proj.style.left = proj.dataset.x + "px";
+      proj.style.top = proj.dataset.y + "px";
+      shipProjectiles.appendChild(proj);
+      projectiles.push(proj);
+    }
+
+    // Move projectiles
+    projectiles.forEach(p => {
+      let x = parseFloat(p.dataset.x) + parseFloat(p.dataset.vx || 400) * dt;
+      p.dataset.x = x;
+      p.style.left = x + "px";
+      if (x > vw + 20) p.remove();
+    });
+
+    // Move obstacles & collision with projectiles
+    obstacles.forEach(o => {
+      let x = parseFloat(o.dataset.x) + parseFloat(o.dataset.vx || -100) * dt;
+      o.dataset.x = x;
+      o.style.left = x + "px";
+      o.style.top = o.dataset.y + "px";
+
+      projectiles.forEach(p => {
+        if (!p.parentNode) return;
+        const px = parseFloat(p.dataset.x);
+        const py = parseFloat(p.dataset.y);
+        const ox = parseFloat(o.dataset.x);
+        const oy = parseFloat(o.dataset.y);
+        const rad = o.classList.contains("junk") ? 10 : 14;
+        if (Math.abs(px - ox) < 20 && Math.abs(py - oy) < rad + 6){
+          let hp = parseFloat(o.dataset.hp || 1) - (hasTool("lens") ? 0.5 : 0.35);
+          if (hp <= 0) o.remove();
+          else o.dataset.hp = hp;
+          p.remove();
+        }
+      });
+
+      if (x < -40) o.remove();
+
+      // Ship hit?
+      const ox2 = x + (o.classList.contains("junk") ? 8 : 12);
+      const oy2 = parseFloat(o.dataset.y) + (o.classList.contains("junk") ? 8 : 12);
+      if (ox2 > shipLeft && x < shipRight && oy2 > shipTop && parseFloat(o.dataset.y) < shipBottom && now() > shipHitUntil){
+        shipHitUntil = now() + 800;
+        const lost = Math.max(1, Math.floor((S.dust || 0) * 0.002));
+        S.dust = Math.max(0, (S.dust || 0) - lost);
+        o.remove();
+      }
+    });
+
+    // Move collectibles & collect
+    collectibles.forEach(c => {
+      let x = parseFloat(c.dataset.x) + parseFloat(c.dataset.vx || 0) * dt;
+      c.dataset.x = x;
+      c.style.left = x + "px";
+      const cx = x + 6;
+      const cy = parseFloat(c.dataset.y) + 6;
+      if (cx > shipLeft && cx < shipRight && cy > shipTop && cy < shipBottom){
+        S.dust = (S.dust || 0) + 1;
+        S.totalDust = (S.totalDust || 0) + 1;
+        c.remove();
+      }
+      if (x < -30 || x > vw + 30) c.remove();
+    });
+
+    // Prune removed nodes from arrays
+    projectiles.splice(0, projectiles.length, ...projectiles.filter(p => p.parentNode));
+    obstacles.splice(0, obstacles.length, ...obstacles.filter(o => o.parentNode));
+    collectibles.splice(0, collectibles.length, ...collectibles.filter(c => c.parentNode));
+
+    // HUD
+    const hudSpeed = $("shipHudSpeed");
+    if (hudSpeed) hudSpeed.textContent = "Speed: " + shipSpeedMult().toFixed(1) + "×";
   }
 
   // ---------- Save / Load ----------
@@ -1055,6 +1623,7 @@
 
     updateEventBanner();
     checkAchievements();
+    updateShipVisual();
     toast("Loaded", "Welcome back.");
   }
 
@@ -1164,6 +1733,7 @@
     renderTop();
     updateShopState();
     if (activeTab === "achievements") renderAchievements();
+    shipTick(dt);
 
     requestAnimationFrame(tick);
   }
@@ -1182,6 +1752,7 @@
   setTab("machines"); // ✅ machines first
   addLog("good", "Welcome", "Click the orb to forge Stardust. Buy Machines for DPS, then Tools for buffs.");
   updateEventBanner();
+  updateShipVisual();
   renderTop();
   updateShopState();
   requestAnimationFrame(tick);
