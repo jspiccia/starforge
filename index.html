@@ -34,17 +34,15 @@
     <div id="instructions">
       <div id="instructionsMobile" style="display: none;">
         <strong>How to play</strong><br>
-        Tilt phone left/right to aim.<br>
-        Tap screen to fire the stream.<br>
-        Hit orange balls (+10), toilet bowl (+20).<br>
-        Avoid the duck (−10). Golden duck = +100.
+        Tilt phone left/right to aim; more tilt = longer stream.<br>
+        Tap screen to fire.<br>
+        Hit balls (+10), baby (+15), plane (+25). Avoid duck (−10). Golden duck = +100.
       </div>
       <div id="instructionsDesktop" style="display: none;">
         <strong>How to play</strong><br>
-        Use mouse left/right movement to aim (or A/D keys).<br>
-        Click (or hold) to fire the stream.<br>
-        Hit orange balls (+10), toilet bowl (+20).<br>
-        Avoid the duck (−10). Golden duck = +100.
+        Mouse left/right to aim; distance from center = stream length (or A/D aim, W/S length).<br>
+        Click (or hold) to fire.<br>
+        Hit balls (+10), baby (+15), plane (+25). Avoid duck (−10). Golden duck = +100.
       </div>
     </div>
     <div id="gameOver">
@@ -70,6 +68,14 @@
   window.addEventListener('resize', resize);
   resize();
 
+  // ========== IMAGE ASSETS ==========
+  var imgBaby = new Image();
+  var imgDuck = new Image();
+  var imgPlane = new Image();
+  imgBaby.src = 'baby.png';
+  imgDuck.src = 'duck.png';
+  imgPlane.src = 'plane.png';
+
   // ========== GAME STATE ==========
   let state = 'idle'; // idle | playing | gameOver
   let score = 0;
@@ -78,14 +84,20 @@
   let comboCount = 0;
   let comboMultiplier = 1;
   let aimAngle = -Math.PI / 2;
+  let streamPower = 1;
   let firing = false;
   let streamParticles = [];
   let targets = [];
   let duck = null;
   let goldenDuck = null;
-  let toiletBowl = { x: 0, y: 0, r: 55, moving: false, vx: 0 };
+  let baby = null;
+  let plane = null;
+  let babyRespawnAt = 0;
+  let planeSpawnAccum = 0;
   let screenShake = 0;
-  let turboUntil = 0;
+  let splitStreamUntil = 0;
+  const SPLIT_STREAM_OFFSET = 0.22;
+  const SPLIT_STREAM_DURATION = 4000;
   let windUntil = 0;
   let windForce = 0;
   let shrinkFactor = 1;
@@ -124,40 +136,40 @@
     }
   }
 
-  // ========== TURBO STREAM POWERUP ==========
-  // Floating collectible; hit with stream to temporarily increase speed and arc length.
-  let turboPickup = null;
-  function trySpawnTurboPickup() {
-    if (turboPickup || turboUntil > Date.now()) return;
+  // ========== SPLIT STREAM POWERUP ==========
+  // Hit with stream to add two extra streams (left/right) for a short time. Stacks each time you hit it.
+  let splitStreamPickup = null;
+  function trySpawnSplitStreamPickup() {
+    if (splitStreamPickup || splitStreamUntil > Date.now()) return;
     if (Math.random() > 0.008) return;
-    turboPickup = {
+    splitStreamPickup = {
       x: 30 + Math.random() * (W - 60),
       y: H * 0.3 + Math.random() * H * 0.3,
       r: 18
     };
   }
-  function updateTurboPickup(dt) {
-    if (!turboPickup || !firing) return;
-    const points = getStreamPoints();
-    for (let i = 0; i < points.length; i++) {
-      if (hitTestCircle(points[i].x, points[i].y, turboPickup.x, turboPickup.y, turboPickup.r)) {
-        turboUntil = Date.now() + 5000;
-        turboPickup = null;
+  function updateSplitStreamPickup(dt) {
+    if (!splitStreamPickup || !firing) return;
+    var points = getAllStreamPoints();
+    for (var i = 0; i < points.length; i++) {
+      if (hitTestCircle(points[i].x, points[i].y, splitStreamPickup.x, splitStreamPickup.y, splitStreamPickup.r)) {
+        splitStreamUntil = Date.now() + SPLIT_STREAM_DURATION;
+        splitStreamPickup = null;
         soundGolden();
         break;
       }
     }
   }
-  function drawTurboPickup() {
-    if (!turboPickup) return;
+  function drawSplitStreamPickup() {
+    if (!splitStreamPickup) return;
     ctx.fillStyle = 'rgba(255,193,7,0.9)';
     ctx.beginPath();
-    ctx.arc(turboPickup.x, turboPickup.y, turboPickup.r, 0, Math.PI * 2);
+    ctx.arc(splitStreamPickup.x, splitStreamPickup.y, splitStreamPickup.r, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#333';
-    ctx.font = '14px sans-serif';
+    ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('TURBO', turboPickup.x, turboPickup.y + 5);
+    ctx.fillText('Split Stream!', splitStreamPickup.x, splitStreamPickup.y + 5);
     ctx.textAlign = 'left';
   }
 
@@ -171,27 +183,28 @@
   }
 
   // --- STREAM PHYSICS (CURVED, GRAVITY) ---
-  const GRAVITY = 0.28;
-  const STREAM_SPEED = 14;
+  // Light gravity + high speed + many segments so stream can reach the top of the screen.
+  const GRAVITY = 0.12;
+  const STREAM_SPEED = 26;
   const SEGMENT_DIST = 8;
-  const MAX_SEGMENTS = 35;
+  const MAX_SEGMENTS = 90;
 
   function getStreamSpeed() {
-    return turboUntil > Date.now() ? STREAM_SPEED * 1.6 : STREAM_SPEED;
+    return STREAM_SPEED * streamPower;
   }
 
   function getStreamSegments() {
-    return turboUntil > Date.now() ? Math.floor(MAX_SEGMENTS * 1.4) : MAX_SEGMENTS;
+    return Math.max(45, Math.floor(MAX_SEGMENTS * streamPower));
   }
 
-  function getStreamPoints() {
+  function getStreamPointsWithAngle(angle) {
     const speed = getStreamSpeed();
     const maxSeg = getStreamSegments();
     const points = [];
     let x = player.x;
     let y = player.y;
-    let vx = Math.cos(aimAngle) * speed;
-    let vy = Math.sin(aimAngle) * speed;
+    let vx = Math.cos(angle) * speed;
+    let vy = Math.sin(angle) * speed;
     points.push({ x, y });
     for (let i = 0; i < maxSeg; i++) {
       vy += GRAVITY;
@@ -201,6 +214,18 @@
       points.push({ x, y });
     }
     return points;
+  }
+
+  function getStreamPoints() {
+    return getStreamPointsWithAngle(aimAngle);
+  }
+
+  function getAllStreamPoints() {
+    var main = getStreamPointsWithAngle(aimAngle);
+    if (splitStreamUntil <= Date.now()) return main;
+    var left = getStreamPointsWithAngle(aimAngle - SPLIT_STREAM_OFFSET);
+    var right = getStreamPointsWithAngle(aimAngle + SPLIT_STREAM_OFFSET);
+    return main.concat(left).concat(right);
   }
 
   // ========== TARGETS (FLOATING BALLS) ==========
@@ -234,6 +259,14 @@
   const DUCK_W = 50;
   const DUCK_H = 35;
 
+  const BABY_W = 44;
+  const BABY_H = 50;
+  const BABY_POINTS = 15;
+
+  const PLANE_W = 60;
+  const PLANE_H = 32;
+  const PLANE_POINTS = 25;
+
   function spawnDuck() {
     if (duck && !duck.flyingAway) return;
     const fromLeft = Math.random() > 0.5;
@@ -261,26 +294,28 @@
     };
   }
 
-  // ========== TOILET BOWL TARGET ==========
-  // Circular zone; +20 hit; splash on miss; can move horizontally (random spawn).
-  function initToiletBowl() {
-    toiletBowl.x = W / 2;
-    toiletBowl.y = H - 120;
-    toiletBowl.r = 55;
-    toiletBowl.moving = false;
-    toiletBowl.vx = 0;
+  function spawnBaby() {
+    if (baby || Date.now() < babyRespawnAt) return;
+    baby = {
+      x: BABY_W + Math.random() * (W - 2 * BABY_W),
+      y: BABY_H + Math.random() * (H * 0.45 - 2 * BABY_H),
+      w: BABY_W,
+      h: BABY_H,
+      vx: (Math.random() - 0.5) * 3,
+      vy: (Math.random() - 0.5) * 3
+    };
   }
 
-  function updateToiletBowl(dt) {
-    if (!toiletBowl.moving) {
-      if (Math.random() < 0.002) {
-        toiletBowl.moving = true;
-        toiletBowl.vx = (Math.random() - 0.5) * 2;
-      }
-    } else {
-      toiletBowl.x += toiletBowl.vx * dt * 0.06;
-      if (toiletBowl.x < toiletBowl.r || toiletBowl.x > W - toiletBowl.r) toiletBowl.vx *= -1;
-    }
+  function spawnPlane() {
+    if (plane) return;
+    var fromLeft = Math.random() > 0.5;
+    plane = {
+      x: fromLeft ? -PLANE_W - 30 : W + 30,
+      y: H * 0.15 + Math.random() * H * 0.2,
+      w: PLANE_W,
+      h: PLANE_H,
+      vx: fromLeft ? 6 : -6
+    };
   }
 
   // ========== AUDIO (SIMPLE WEB AUDIO) ==========
@@ -414,6 +449,35 @@
         break;
       }
 
+      if (baby && hitTestRect(p.x, p.y, baby.x, baby.y, baby.w, baby.h)) {
+        hitSomething = true;
+        var pts = BABY_POINTS * comboMultiplier;
+        score += pts;
+        soundHit();
+        vibrateHit();
+        addSplashParticles(baby.x + baby.w / 2, baby.y + baby.h / 2, 8);
+        addComboPopup(baby.x + baby.w / 2, baby.y, '+' + pts);
+        baby = null;
+        babyRespawnAt = Date.now() + 2000;
+        comboCount++;
+        comboMultiplier = Math.min(5, 1 + Math.floor(comboCount / 2));
+        break;
+      }
+
+      if (plane && hitTestRect(p.x, p.y, plane.x, plane.y, plane.w, plane.h)) {
+        hitSomething = true;
+        var pts = PLANE_POINTS * comboMultiplier;
+        score += pts;
+        soundHit();
+        vibrateHit();
+        addSplashParticles(plane.x + plane.w / 2, plane.y + plane.h / 2, 10);
+        addComboPopup(plane.x + plane.w / 2, plane.y, '+' + pts);
+        plane = null;
+        comboCount++;
+        comboMultiplier = Math.min(5, 1 + Math.floor(comboCount / 2));
+        break;
+      }
+
       for (let t = targets.length - 1; t >= 0; t--) {
         const ball = targets[t];
         if (hitTestCircle(p.x, p.y, ball.x, ball.y, ball.r)) {
@@ -431,17 +495,6 @@
       }
       if (hitSomething) break;
 
-      if (hitTestCircle(p.x, p.y, toiletBowl.x, toiletBowl.y, toiletBowl.r)) {
-        hitSomething = true;
-        score += 20 * comboMultiplier;
-        soundHit();
-        vibrateHit();
-        addSplashParticles(toiletBowl.x, toiletBowl.y, 12);
-        addComboPopup(toiletBowl.x, toiletBowl.y - toiletBowl.r, '+' + (20 * comboMultiplier));
-        comboCount++;
-        comboMultiplier = Math.min(5, 1 + Math.floor(comboCount / 2));
-        break;
-      }
     }
 
     if (!hitSomething && points.length > 5) {
@@ -464,8 +517,10 @@
   function bindOrientation() {
     orientationHandler = function(e) {
       if (state !== 'playing' || e.gamma == null) return;
-      const g = Math.max(-60, Math.min(60, e.gamma));
-      aimAngle = -Math.PI / 2 + (g / 60) * Math.PI * 0.6;
+      const g = Math.max(-90, Math.min(90, e.gamma));
+      aimAngle = -Math.PI / 2 + (g / 90) * Math.PI * 0.95;
+      var tiltAmount = Math.min(90, Math.abs(g));
+      streamPower = 0.65 + (tiltAmount / 90) * 0.85;
     };
     window.addEventListener('deviceorientation', orientationHandler);
   }
@@ -475,18 +530,23 @@
     orientationHandler = null;
   }
 
-  // Desktop: mouse or A/D keys control aim
+  // Desktop: mouse controls aim and stream length; full range so stream can hit any target
   canvas.addEventListener('mousemove', function(e) {
     if (state !== 'playing' || isTouchDevice) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const t = (x - rect.width / 2) / (rect.width / 2);
-    aimAngle = -Math.PI / 2 + Math.max(-0.8, Math.min(0.8, t)) * Math.PI * 0.5;
+    const centerX = rect.width / 2;
+    const t = (x - centerX) / centerX;
+    aimAngle = -Math.PI / 2 + Math.max(-1, Math.min(1, t)) * Math.PI * 0.95;
+    var distFromCenter = Math.min(1, Math.abs(x - centerX) / centerX);
+    streamPower = 0.65 + distFromCenter * 0.85;
   });
   window.addEventListener('keydown', function(e) {
     if (state !== 'playing' || isTouchDevice) return;
-    if (e.key === 'a' || e.key === 'A') aimAngle = Math.max(-Math.PI / 2 - 0.8, aimAngle - 0.06);
-    if (e.key === 'd' || e.key === 'D') aimAngle = Math.min(-Math.PI / 2 + 0.8, aimAngle + 0.06);
+    if (e.key === 'a' || e.key === 'A') aimAngle = Math.max(-Math.PI - 0.1, aimAngle - 0.06);
+    if (e.key === 'd' || e.key === 'D') aimAngle = Math.min(0.1, aimAngle + 0.06);
+    if (e.key === 'w' || e.key === 'W') streamPower = Math.min(1.5, streamPower + 0.05);
+    if (e.key === 's' || e.key === 'S') streamPower = Math.max(0.65, streamPower - 0.05);
   });
 
   canvas.addEventListener('touchstart', function(e) {
@@ -507,19 +567,18 @@
     if (state !== 'playing') return;
 
     updatePlayerPosition();
-    updateToiletBowl(dt);
     updateBackgroundBubbles(dt);
 
     if (screenShake > 0) screenShake -= dt * 0.2;
     if (screenShake < 0) screenShake = 0;
 
-    if (turboUntil > 0 && turboUntil < Date.now()) turboUntil = 0;
+    if (splitStreamUntil > 0 && splitStreamUntil < Date.now()) splitStreamUntil = 0;
     if (windUntil > 0 && windUntil < Date.now()) { windUntil = 0; windForce = 0; }
 
     shrinkFactor = Math.max(0.4, 1 - (30 - timeLeft) / 30 * 0.6);
 
     if (firing) {
-      const points = getStreamPoints();
+      var points = getAllStreamPoints();
       checkStreamCollisions(points);
     }
 
@@ -555,6 +614,18 @@
       }
     }
 
+    if (baby) {
+      baby.x += baby.vx;
+      baby.y += baby.vy;
+      if (baby.x <= 0 || baby.x >= W - baby.w) baby.vx *= -1;
+      if (baby.y <= 0 || baby.y >= H - baby.h) baby.vy *= -1;
+    }
+
+    if (plane) {
+      plane.x += plane.vx;
+      if (plane.x < -PLANE_W - 80 || plane.x > W + 80) plane = null;
+    }
+
     for (let i = streamParticles.length - 1; i >= 0; i--) {
       const p = streamParticles[i];
       p.x += p.vx * dt * 0.06;
@@ -571,8 +642,8 @@
       if (c.life <= 0) comboPopups.splice(i, 1);
     }
 
-    trySpawnTurboPickup();
-    updateTurboPickup(dt);
+    trySpawnSplitStreamPickup();
+    updateSplitStreamPickup(dt);
 
     // Spawn one ball roughly every 2s at start, every ~1.2s as timer runs down (dt in ms).
     spawnAccum += dt / (2200 - (30 - timeLeft) * 35);
@@ -591,6 +662,13 @@
     if (goldenDuckSpawnAccum > 1 && !goldenDuck) {
       goldenDuckSpawnAccum = 0;
       spawnGoldenDuck();
+    }
+
+    spawnBaby();
+    planeSpawnAccum += dt * 0.04;
+    if (planeSpawnAccum > 1 && !plane) {
+      planeSpawnAccum = 0;
+      spawnPlane();
     }
 
     if (Math.random() < 0.001 && windUntil < Date.now()) {
@@ -618,18 +696,6 @@
       ctx.fill();
     });
 
-    ctx.fillStyle = '#0d3d4d';
-    ctx.beginPath();
-    ctx.ellipse(toiletBowl.x, toiletBowl.y + 15, toiletBowl.r * 1.1, toiletBowl.r * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#1565c0';
-    ctx.beginPath();
-    ctx.arc(toiletBowl.x, toiletBowl.y, toiletBowl.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0d47a1';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
     targets.forEach(function(t) {
       ctx.fillStyle = t.isGolden ? '#ffd700' : '#ff5722';
       ctx.beginPath();
@@ -641,32 +707,69 @@
     });
 
     if (duck && !duck.flyingAway) {
-      ctx.fillStyle = '#ff9800';
-      ctx.fillRect(duck.x, duck.y, duck.w, duck.h);
-      ctx.fillStyle = '#000';
-      ctx.font = '14px sans-serif';
-      ctx.fillText('QUACK', duck.x + 8, duck.y + 22);
+      if (imgDuck.complete && imgDuck.naturalWidth) {
+        ctx.drawImage(imgDuck, duck.x, duck.y, duck.w, duck.h);
+      } else {
+        ctx.fillStyle = '#ff9800';
+        ctx.fillRect(duck.x, duck.y, duck.w, duck.h);
+        ctx.fillStyle = '#000';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('QUACK', duck.x + 8, duck.y + 22);
+      }
     }
 
     if (goldenDuck && !goldenDuck.flyingAway) {
-      ctx.fillStyle = '#ffd700';
-      ctx.fillRect(goldenDuck.x, goldenDuck.y, goldenDuck.w, goldenDuck.h);
-      ctx.fillStyle = '#333';
-      ctx.font = '12px sans-serif';
-      ctx.fillText('100', goldenDuck.x + 14, goldenDuck.y + 22);
+      if (imgDuck.complete && imgDuck.naturalWidth) {
+        ctx.globalAlpha = 0.95;
+        ctx.drawImage(imgDuck, goldenDuck.x, goldenDuck.y, goldenDuck.w, goldenDuck.h);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText('100', goldenDuck.x + 14, goldenDuck.y + 22);
+      } else {
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(goldenDuck.x, goldenDuck.y, goldenDuck.w, goldenDuck.h);
+        ctx.fillStyle = '#333';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('100', goldenDuck.x + 14, goldenDuck.y + 22);
+      }
     }
 
     if (duck && duck.flyingAway) {
       ctx.globalAlpha = 0.8;
-      ctx.fillStyle = '#ff9800';
-      ctx.fillRect(duck.x, duck.y, duck.w, duck.h);
+      if (imgDuck.complete && imgDuck.naturalWidth) ctx.drawImage(imgDuck, duck.x, duck.y, duck.w, duck.h);
+      else { ctx.fillStyle = '#ff9800'; ctx.fillRect(duck.x, duck.y, duck.w, duck.h); }
       ctx.globalAlpha = 1;
     }
     if (goldenDuck && goldenDuck.flyingAway) {
       ctx.globalAlpha = 0.8;
-      ctx.fillStyle = '#ffd700';
-      ctx.fillRect(goldenDuck.x, goldenDuck.y, goldenDuck.w, goldenDuck.h);
+      if (imgDuck.complete && imgDuck.naturalWidth) ctx.drawImage(imgDuck, goldenDuck.x, goldenDuck.y, goldenDuck.w, goldenDuck.h);
+      else { ctx.fillStyle = '#ffd700'; ctx.fillRect(goldenDuck.x, goldenDuck.y, goldenDuck.w, goldenDuck.h); }
       ctx.globalAlpha = 1;
+    }
+
+    if (baby) {
+      if (imgBaby.complete && imgBaby.naturalWidth) ctx.drawImage(imgBaby, baby.x, baby.y, baby.w, baby.h);
+      else {
+        ctx.fillStyle = '#ffb74d';
+        ctx.fillRect(baby.x, baby.y, baby.w, baby.h);
+        ctx.fillStyle = '#333';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('+15', baby.x + 12, baby.y + baby.h / 2 + 4);
+      }
+    }
+
+    if (plane) {
+      if (imgPlane.complete && imgPlane.naturalWidth) {
+        if (plane.vx > 0) ctx.save(), ctx.translate(plane.x + plane.w, plane.y), ctx.scale(-1, 1), ctx.drawImage(imgPlane, 0, 0, plane.w, plane.h), ctx.restore();
+        else ctx.drawImage(imgPlane, plane.x, plane.y, plane.w, plane.h);
+      } else {
+        ctx.fillStyle = '#90a4ae';
+        ctx.fillRect(plane.x, plane.y, plane.w, plane.h);
+        ctx.fillStyle = '#333';
+        ctx.font = '11px sans-serif';
+        ctx.fillText('+25', plane.x + 18, plane.y + plane.h / 2 + 4);
+      }
     }
 
     streamParticles.forEach(function(p) {
@@ -677,15 +780,28 @@
     });
 
     if (firing && state === 'playing') {
-      const points = getStreamPoints();
+      var mainPoints = getStreamPointsWithAngle(aimAngle);
       ctx.strokeStyle = 'rgba(100,200,255,0.9)';
       ctx.lineWidth = 6;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.moveTo(mainPoints[0].x, mainPoints[0].y);
+      for (var i = 1; i < mainPoints.length; i++) ctx.lineTo(mainPoints[i].x, mainPoints[i].y);
       ctx.stroke();
+      if (splitStreamUntil > Date.now()) {
+        var leftPoints = getStreamPointsWithAngle(aimAngle - SPLIT_STREAM_OFFSET);
+        ctx.strokeStyle = 'rgba(150,220,255,0.85)';
+        ctx.beginPath();
+        ctx.moveTo(leftPoints[0].x, leftPoints[0].y);
+        for (var j = 1; j < leftPoints.length; j++) ctx.lineTo(leftPoints[j].x, leftPoints[j].y);
+        ctx.stroke();
+        var rightPoints = getStreamPointsWithAngle(aimAngle + SPLIT_STREAM_OFFSET);
+        ctx.beginPath();
+        ctx.moveTo(rightPoints[0].x, rightPoints[0].y);
+        for (var k = 1; k < rightPoints.length; k++) ctx.lineTo(rightPoints[k].x, rightPoints[k].y);
+        ctx.stroke();
+      }
     }
 
     ctx.fillStyle = '#37474f';
@@ -721,14 +837,14 @@
       ctx.fillText('WIND ' + (windForce > 0 ? '→' : '←'), W / 2, 50);
       ctx.textAlign = 'left';
     }
-    if (turboUntil > Date.now()) {
+    if (splitStreamUntil > Date.now()) {
       ctx.fillStyle = 'rgba(255,193,7,0.8)';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('TURBO', W / 2, 70);
+      ctx.fillText('Split Stream!', W / 2, 70);
       ctx.textAlign = 'left';
     }
-    drawTurboPickup();
+    drawSplitStreamPickup();
 
     ctx.restore();
   }
@@ -758,18 +874,22 @@
       targets = [];
       duck = null;
       goldenDuck = null;
-      turboPickup = null;
+      baby = null;
+      plane = null;
+      babyRespawnAt = 0;
+      planeSpawnAccum = 0;
+      splitStreamPickup = null;
       streamParticles = [];
       comboPopups = [];
       spawnAccum = 0;
       duckSpawnAccum = 0;
       goldenDuckSpawnAccum = 0;
       screenShake = 0;
-      turboUntil = 0;
+      splitStreamUntil = 0;
       windUntil = 0;
       windForce = 0;
       shrinkFactor = 1;
-      initToiletBowl();
+      streamPower = 1;
       initBackgroundBubbles();
       bindOrientation();
       lastTime = performance.now();
