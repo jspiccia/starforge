@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Starforger Clicker ✨</title>
+  <style>
+    :root{
+      --bg:#070a10;
+      --panel:#0f1621;
+      --panel2:#0b111b;
+      --border:#1d2a3a;
+      --text:#e8eef8;
+      --muted:#a7b6cc;
+      --good:#5dd39e;
+      --bad:#ff6b6b;
+      --gold:#ffcc66;
+      --purple:#b388ff;
+      --cyan:#7bdff2;
+      --shadow: rgba(0,0,0,.35);
+      --btn:#121e2c;
+      --btnBorder:#284056;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+    }
+    body{
+      margin:0;
+      background:
+        radial-gradient(1200px 600px at 30% 10%, rgba(123,223,242,.08), transparent 60%),
+        radial-gradient(900px 500px at 80% 30%, rgba(179,136,255,.08), transparent 55%),
+        radial-gradient(900px 650px at 50% 90%, rgba(255,204,102,.05), transparent 65%),
+        var(--bg);
+      overflow-x:hidden;
+    }
+    .wrap{ max-width: 1200px; margin:0 auto; padding: 16px; }
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      margin-bottom: 12px;
+    }
+    h1{ margin:0; font-size: 22px; letter-spacing:.3px; }
+    .subtitle{ margin:0; color: var(--muted); font-size: 13px; }
+    .topRow{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .pill{
+      background: rgba(15,22,33,.8);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      box-shadow: 0 8px 22px var(--shadow);
+      backdrop-filter: blur(6px);
+      display:flex; align-items:center; gap:8px;
+      user-select:none;
+    }
+    .pill b{ color: var(--text); }
+    button{
+      background: var(--btn);
+      border: 1px solid var(--btnBorder);
+      color: var(--text);
+      padding: 9px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight: 800;
+    }
+    button:hover{ filter: brightness(1.08); }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+    .ghost{
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 14px;
+    }
+    @media(max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+    .card{
+      background: rgba(15,22,33,.85);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 18px 60px var(--shadow);
+      backdrop-filter: blur(8px);
+      padding: 14px;
+    }
+    .cardTitle{
+      display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;
+      margin-bottom: 10px;
+    }
+    .cardTitle h2{ margin:0; font-size: 16px; }
+    .small{ font-size:12px; color: var(--muted); }
+    .bigNumber{
+      font-variant-numeric: tabular-nums;
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: .3px;
+      margin: 10px 0 6px;
+    }
+    .rate{
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    /* Orb */
+    .orbWrap{
+      display:flex;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .orbArea{
+      position: relative;
+      width: 320px;
+      height: 320px;
+      margin: 4px auto 0;
+      flex: 0 0 auto;
+    }
+    @media(max-width: 520px){
+      .orbArea{ width: 280px; height: 280px; }
+    }
+    .orb{
+      width: 100%;
+      height: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.08);
+      background:
+        radial-gradient(circle at 30% 30%, rgba(123,223,242,.38), transparent 45%),
+        radial-gradient(circle at 65% 40%, rgba(179,136,255,.34), transparent 48%),
+        radial-gradient(circle at 45% 70%, rgba(255,204,102,.18), transparent 52%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.08), rgba(0,0,0,.35) 60%),
+        #0a101a;
+      box-shadow:
+        inset 0 0 30px rgba(0,0,0,.45),
+        0 25px 60px rgba(0,0,0,.6);
+      cursor:pointer;
+      user-select:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transform: translateZ(0);
+      transition: transform .06s ease;
+      position: relative;
+      overflow:hidden;
+      touch-action: manipulation;
+    }
+    .orb:active{ transform: scale(.985); }
+    .orbGlow{
+      position:absolute; inset:-30%;
+      background: conic-gradient(from 0deg,
+        rgba(123,223,242,.0),
+        rgba(123,223,242,.22),
+        rgba(179,136,255,.2),
+        rgba(255,204,102,.12),
+        rgba(123,223,242,.22),
+        rgba(123,223,242,.0)
+      );
+      filter: blur(18px);
+      animation: spin 6.5s linear infinite;
+      opacity:.85;
+    }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+    .orbCore{
+      position: absolute; inset: 14%;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.12), rgba(0,0,0,.48) 70%);
+      border: 1px solid rgba(255,255,255,.09);
+      box-shadow: inset 0 0 26px rgba(0,0,0,.6);
+    }
+    .orbText{
+      position: relative;
+      text-align:center;
+      z-index: 2;
+      padding: 10px;
+    }
+    .orbText .label{ color: var(--muted); font-size: 12px; }
+    .orbText .tap{ font-size: 18px; font-weight: 900; letter-spacing: .2px; }
+    .orbText .hint{ color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+    /* Floating numbers */
+    .float{
+      position:absolute;
+      transform: translate(-50%,-50%);
+      pointer-events:none;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 8px 30px rgba(0,0,0,.85);
+      opacity: 0;
+      animation: floatUp .85s ease forwards;
+      white-space: nowrap;
+    }
+    @keyframes floatUp{
+      0%{ opacity:0; transform: translate(-50%,-50%) scale(.96); }
+      20%{ opacity: 1; }
+      100%{ opacity:0; transform: translate(-50%,-120%) scale(1.05); }
+    }
+
+    /* Tabs */
+    .tabs{ display:flex; gap: 8px; flex-wrap:wrap; margin-bottom: 10px; }
+    .tabBtn{
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(10,16,26,.55);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 900;
+      font-size: 12px;
+      cursor: pointer;
+      user-select:none;
+    }
+    .tabBtn.active{
+      color: var(--text);
+      border-color: rgba(123,223,242,.35);
+      box-shadow: 0 0 0 2px rgba(123,223,242,.08) inset;
+    }
+
+    /* Lists */
+    .list{ display:flex; flex-direction:column; gap:10px; }
+    .item{
+      background: rgba(11,17,27,.75);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      transition: transform .08s ease, border-color .08s ease;
+    }
+    .item.canBuy{
+      border-color: rgba(93,211,158,.35);
+      box-shadow: 0 0 0 2px rgba(93,211,158,.08) inset;
+    }
+    .item.canBuy .name::after{
+      content:"  • can buy";
+      color: rgba(93,211,158,.9);
+      font-weight: 900;
+      font-size: 11px;
+    }
+    .item.pulse{
+      animation: pulse 1.1s ease-in-out infinite;
+    }
+    @keyframes pulse{
+      0%,100% { transform: translateZ(0) scale(1); }
+      50% { transform: translateZ(0) scale(1.015); }
+    }
+    .item .left{ min-width: 0; }
+    .item .name{ font-weight: 900; }
+    .item .desc{ color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.25; }
+    .badge{
+      font-size: 11px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid #284056;
+      background: rgba(10,16,26,.55);
+      color: var(--muted);
+      white-space:nowrap;
+      user-select:none;
+    }
+    .priceRow{ display:flex; gap: 8px; align-items:center; justify-content:flex-end; flex-wrap:wrap;}
+    .price{ font-weight: 900; font-variant-numeric: tabular-nums; }
+    .owned{ color: var(--good); font-weight: 900; }
+
+    /* Log */
+    .log{
+      height: 230px;
+      overflow:auto;
+      padding-right: 6px;
+      scrollbar-color: #2a4158 #0c121b;
+    }
+    .entry{
+      border: 1px solid var(--border);
+      background: rgba(11,17,27,.75);
+      border-radius: 12px;
+      padding: 10px;
+      margin: 8px 0;
+    }
+    .entry .meta{ font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .entry.good{ border-left: 4px solid var(--good); }
+    .entry.bad{ border-left: 4px solid var(--bad); }
+    .entry.gold{ border-left: 4px solid var(--gold); }
+    .entry.purple{ border-left: 4px solid var(--purple); }
+
+    /* Toast */
+    .toast{
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      max-width: 360px;
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+      z-index: 50;
+      pointer-events:none;
+    }
+    .toast .t{
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(15,22,33,.92);
+      border: 1px solid var(--border);
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+      animation: pop .2s ease;
+    }
+    @keyframes pop{ from{ transform: translateY(8px); opacity:.6 } to{ transform: translateY(0); opacity: 1 } }
+    .t .title{ font-weight: 900; }
+    .t .msg{ color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+    /* Mini stats */
+    .mini{
+      display:flex; flex-direction:column; gap: 10px; min-width: 240px;
+      flex:1 1 240px;
+    }
+    .meter{
+      background: rgba(11,17,27,.75);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+    }
+    .bar{
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(10,16,26,.7);
+      border: 1px solid rgba(255,255,255,.06);
+      overflow:hidden;
+      margin-top: 8px;
+    }
+    .fill{
+      height:100%;
+      width: 0%;
+      background: var(--cyan);
+      transition: width .15s linear;
+    }
+    .controls{
+      display:flex; gap: 8px; flex-wrap:wrap; margin-top: 10px; align-items:center;
+    }
+    .eventBanner{
+      border: 1px solid rgba(255,204,102,.22);
+      background: rgba(255,204,102,.06);
+      border-radius: 14px;
+      padding: 10px;
+      margin-top: 10px;
+      display:none;
+    }
+    .eventBanner b{ color: var(--gold); }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Starforger Clicker ✨</h1>
+        <p class="subtitle">Click → buy Machines for DPS → buy Tools for multipliers → reboot reality.</p>
+      </div>
+      <div class="topRow">
+        <div class="pill">✨ Stardust: <b id="dustTxt">0</b></div>
+        <div class="pill">⚡ per sec: <b id="dpsTxt">0</b></div>
+        <div class="pill">👆 per click: <b id="dpcTxt">1</b></div>
+        <button id="saveBtn" class="ghost">Save</button>
+        <button id="loadBtn" class="ghost">Load</button>
+        <button id="resetBtn" class="ghost">Reset</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left -->
+      <div class="card">
+        <div class="cardTitle">
+          <h2>Forge</h2>
+          <div class="small">Hold-click works. Starburst triggers at 100% Overcharge.</div>
+        </div>
+
+        <div class="bigNumber" id="bigDust">0 Stardust</div>
+        <div class="rate" id="rateTxt">0 per second • 1 per click</div>
+
+        <div class="orbWrap">
+          <div class="mini">
+            <div class="meter">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <div><b>Overcharge</b> <span class="small">(builds as you click)</span></div>
+                <span class="badge" id="overTxt">0%</span>
+              </div>
+              <div class="bar"><div class="fill" id="overFill"></div></div>
+              <div class="small" style="margin-top:8px;">At 100%, your next click triggers a <b>Starburst</b> bonus.</div>
+            </div>
+
+            <div class="meter">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <div><b>Reboot Shards</b> <span class="small">(prestige-lite)</span></div>
+                <span class="badge"><span id="shardsTxt">0</span> shards</span>
+              </div>
+              <div class="small" style="margin-top:8px;">
+                Reboot resets your run but gives permanent bonuses.
+              </div>
+              <div class="controls">
+                <button id="rebootBtn" class="ghost">Reboot (Prestige)</button>
+              </div>
+            </div>
+
+            <div class="meter eventBanner" id="eventBanner">
+              <div><b>Cosmic Event:</b> <span id="eventTxt"></span></div>
+              <div class="small" id="eventSub"></div>
+            </div>
+          </div>
+
+          <div class="orbArea">
+            <div class="orb" id="orb">
+              <div class="orbGlow"></div>
+              <div class="orbCore"></div>
+              <div class="orbText">
+                <div class="label">Click to forge</div>
+                <div class="tap">STARDUST</div>
+                <div class="hint">Overcharge ➜ Starburst bonus</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="boostBtn">Activate Starboost (30s)</button>
+          <span class="pill">⭐ Starboost: <b id="boostTxt">ready</b></span>
+          <span class="pill">🏆 Achievements: <b id="achCountTxt">0</b></span>
+        </div>
+      </div>
+
+      <!-- Right -->
+      <div class="card">
+        <div class="cardTitle">
+          <h2>Workshop</h2>
+          <div class="small">Machines = DPS • Tools = buffs • Shop never re-breaks.</div>
+        </div>
+
+        <div class="tabs">
+          <!-- ✅ Machines first, Tools second -->
+          <button class="tabBtn active" data-tab="machines">Machines</button>
+          <button class="tabBtn" data-tab="tools">Tools</button>
+          <button class="tabBtn" data-tab="achievements">Achievements</button>
+          <button class="tabBtn" data-tab="log">Log</button>
+        </div>
+
+        <div id="tab_machines" class="list"></div>
+        <div id="tab_tools" class="list" style="display:none;"></div>
+
+        <div id="tab_achievements" style="display:none;">
+          <div class="small">Achievements give small permanent bonuses for this run.</div>
+          <div id="achList" class="list" style="margin-top:10px;"></div>
+        </div>
+
+        <div id="tab_log" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <div class="small">A record of your cosmic mistakes.</div>
+            <button id="clearLogBtn" class="ghost">Clear</button>
+          </div>
+          <div class="log" id="log"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  // ---------- Helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const now = () => Date.now();
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const fmt = (n) => {
+    if (!isFinite(n)) return "∞";
+    if (n < 1000) return Math.floor(n).toString();
+    const units = ["K","M","B","T","Qa","Qi","Sx","Sp","Oc","No"];
+    let u = -1, x = n;
+    while (x >= 1000 && u < units.length-1) { x /= 1000; u++; }
+    return (x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2)) + units[u];
+  };
+
+  // ---------- Toast + Log ----------
+  const logEntries = [];
+  function toast(title, msg){
+    const t = document.createElement("div");
+    t.className = "t";
+    t.innerHTML = `<div class="title">${title}</div><div class="msg">${msg}</div>`;
+    $("toast").appendChild(t);
+    setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translateY(8px)"; }, 2200);
+    setTimeout(() => t.remove(), 2600);
+  }
+  function addLog(kind, meta, text){
+    logEntries.unshift({ kind, meta, text, ts: new Date().toLocaleTimeString() });
+    if (logEntries.length > 140) logEntries.pop();
+    renderLog();
+  }
+  function renderLog(){
+    const log = $("log");
+    if (!log) return;
+    log.innerHTML = "";
+    for (const e of logEntries){
+      const div = document.createElement("div");
+      div.className = `entry ${e.kind}`;
+      div.innerHTML = `<div class="meta">${e.ts} • ${e.meta}</div><div>${e.text}</div>`;
+      log.appendChild(div);
+    }
+  }
+
+  // ---------- Game State ----------
+  const BASE = {
+    dust: 0,
+    totalDust: 0,
+    dustPerClick: 1,
+    overcharge: 0,
+
+    shards: 0,
+
+    starboostReadyAt: 0,
+    starboostUntil: 0,
+
+    clickCombo: 0,
+    lastClickAt: 0,
+
+    toolsOwned: {},      // renamed from upgradesOwned
+    machinesOwned: {},   // renamed from buildingsOwned
+
+    achUnlocked: {},
+    achBonusMult: 1.0,
+
+    cosmicEvent: null, // {name, until, mult, sub}
+  };
+
+  let S = structuredClone(BASE);
+
+  // ---------- Content ----------
+  // Tools = click buffs / multipliers
+  const tools = [
+    { id:"gloves", name:"Void-Touched Gloves", kind:"click", cost: 15,
+      desc:"+1 per click.",
+      apply(){ S.dustPerClick += 1; }
+    },
+    { id:"tapRhythm", name:"Rhythm of the Nebula", kind:"click", cost: 85,
+      desc:"Click combo increases per-click (up to +30%).",
+      apply(){ /* handled in click calc */ }
+    },
+    { id:"lens", name:"Starlens Focus", kind:"burst", cost: 180,
+      desc:"Starbursts are 25% stronger.",
+      apply(){ /* handled in starburst */ }
+    },
+    { id:"autopulse", name:"Pocket Pulsar", kind:"dps", cost: 90,
+      desc:"+0.5/sec passive (tiny but helpful).",
+      apply(){ /* handled in baseDps */ }
+    },
+    { id:"efficiency", name:"Quantum Efficiency", kind:"mult", cost: 220,
+      desc:"All production +10%.",
+      apply(){ S.achBonusMult *= 1.10; }
+    },
+    { id:"boostCool", name:"Starboost Capacitor", kind:"boost", cost: 320,
+      desc:"Starboost cooldown -25%.",
+      apply(){ /* handled in cooldown */ }
+    },
+    { id:"union", name:"Galactic Workers Union", kind:"machine", cost: 600,
+      desc:"Machines produce +15%. (they demanded snacks)",
+      apply(){ /* handled in machine mult */ }
+    },
+    { id:"compressor", name:"Stardust Compressor", kind:"click", cost: 520,
+      desc:"Per-click +25%.",
+      apply(){ /* handled in click calc */ }
+    },
+    { id:"blueprints", name:"Astral Blueprints", kind:"econ", cost: 900,
+      desc:"Machine cost growth reduced slightly.",
+      apply(){ /* handled in price calc */ }
+    },
+  ];
+
+  // Machines = passive producers
+  const machines = [
+    { id:"drone", name:"Spark Drone", baseCost: 25, baseDps: 0.2,
+      desc:"Tiny worker drone. Reliable. Mildly judgmental."
+    },
+    { id:"mine", name:"Comet Mine", baseCost: 120, baseDps: 1.2,
+      desc:"Extracts stardust from passing comets. Probably legal."
+    },
+    { id:"foundry", name:"Nebula Foundry", baseCost: 650, baseDps: 7.5,
+      desc:"Industrial-scale cosmic forging."
+    },
+    { id:"observatory", name:"Chrono Observatory", baseCost: 3200, baseDps: 42,
+      desc:"Watches time pass. Time gets nervous."
+    },
+    { id:"rift", name:"Rift Engine", baseCost: 18000, baseDps: 250,
+      desc:"Pulls stardust from 'elsewhere'. 'Elsewhere' complains."
+    },
+  ];
+
+  const achievements = [
+    { id:"firstClick", name:"First Spark", desc:"Make your first Stardust.", bonus: 1.02, check: () => S.totalDust >= 1 },
+    { id:"hundred", name:"A Small Pile", desc:"Reach 100 total Stardust.", bonus: 1.03, check: () => S.totalDust >= 100 },
+    { id:"tenK", name:"Dust Tycoon", desc:"Reach 10,000 total Stardust.", bonus: 1.05, check: () => S.totalDust >= 10000 },
+    { id:"combo10", name:"Click Gremlin", desc:"Get a 10-click combo.", bonus: 1.03, check: () => S.clickCombo >= 10 },
+    { id:"m5", name:"Supervisor", desc:"Own 5 machines total.", bonus: 1.04, check: () => totalMachines() >= 5 },
+    { id:"m25", name:"Middle Management", desc:"Own 25 machines total.", bonus: 1.06, check: () => totalMachines() >= 25 },
+    { id:"burst10", name:"Starburst Enjoyer", desc:"Trigger 10 Starbursts.", bonus: 1.04, check: () => (S.achUnlocked._bursts || 0) >= 10 },
+    { id:"event", name:"Touched by the Cosmos", desc:"Experience a Cosmic Event.", bonus: 1.03, check: () => !!S.achUnlocked._eventSeen },
+  ];
+
+  function hasTool(id){ return !!S.toolsOwned[id]; }
+  function totalMachines(){
+    return Object.values(S.machinesOwned).reduce((a,b) => a + (b||0), 0);
+  }
+
+  // ---------- Economy ----------
+  function machineCost(m){
+    const owned = S.machinesOwned[m.id] || 0;
+    const growth = hasTool("blueprints") ? 1.135 : 1.15;
+    return Math.floor(m.baseCost * Math.pow(growth, owned));
+  }
+
+  function shardMultiplier(){
+    return 1 + 0.06 * Math.pow(S.shards, 0.85);
+  }
+
+  function currentMult(){
+    let mult = 1.0;
+    mult *= S.achBonusMult;
+    mult *= shardMultiplier();
+    if (now() < S.starboostUntil) mult *= 2.0;
+    if (S.cosmicEvent && now() < S.cosmicEvent.until) mult *= S.cosmicEvent.mult;
+    return mult;
+  }
+
+  function baseMachineDps(){
+    const machineMult = hasTool("union") ? 1.15 : 1.0;
+    let dps = 0;
+    for (const m of machines){
+      const owned = S.machinesOwned[m.id] || 0;
+      dps += owned * m.baseDps * machineMult;
+    }
+    if (hasTool("autopulse")) dps += 0.5;
+    return dps;
+  }
+
+  function clickValue(){
+    let v = S.dustPerClick;
+
+    if (hasTool("tapRhythm")){
+      const bonus = clamp(S.clickCombo * 0.02, 0, 0.30);
+      v *= (1 + bonus);
+    }
+    if (hasTool("compressor")){
+      v *= 1.25;
+    }
+
+    v *= currentMult();
+    return v;
+  }
+
+  function starburstValue(){
+    let base = (baseMachineDps() * 3) + (S.dustPerClick * 18);
+    if (hasTool("lens")) base *= 1.25;
+    base *= currentMult();
+    return Math.max(5, base);
+  }
+
+  // ---------- UI refs ----------
+  const ui = {
+    dustTxt: $("dustTxt"),
+    bigDust: $("bigDust"),
+    dpsTxt: $("dpsTxt"),
+    dpcTxt: $("dpcTxt"),
+    rateTxt: $("rateTxt"),
+    overTxt: $("overTxt"),
+    overFill: $("overFill"),
+    shardsTxt: $("shardsTxt"),
+    boostTxt: $("boostTxt"),
+    achCountTxt: $("achCountTxt"),
+    eventBanner: $("eventBanner"),
+    eventTxt: $("eventTxt"),
+    eventSub: $("eventSub"),
+    tabMachines: $("tab_machines"),
+    tabTools: $("tab_tools"),
+    achList: $("achList"),
+  };
+
+  // ---------- Shop rendering (IMPORTANT FIX) ----------
+  // We build the DOM ONCE and only update labels/affordability afterwards.
+  const dom = {
+    machine: new Map(), // id -> { root, price, owned, btn }
+    tool: new Map(),    // id -> { root, price, btn, ownedBadge }
+  };
+
+  function buildShopOnce(){
+    // Machines
+    ui.tabMachines.innerHTML = "";
+    for (const m of machines){
+      const root = document.createElement("div");
+      root.className = "item";
+      root.innerHTML = `
+        <div class="left">
+          <div class="name">${m.name} <span class="badge" data-owned>Owned: 0</span></div>
+          <div class="desc">${m.desc}<br/><span class="small">Produces <b data-prod>0</b>/sec each (with multipliers).</span></div>
+        </div>
+        <div class="priceRow">
+          <span class="badge">dps ${fmt(m.baseDps)}</span>
+          <span class="price" data-price>0</span>
+          <button data-buy-machine="${m.id}">Buy</button>
+        </div>
+      `;
+      ui.tabMachines.appendChild(root);
+
+      dom.machine.set(m.id, {
+        root,
+        owned: root.querySelector("[data-owned]"),
+        prod: root.querySelector("[data-prod]"),
+        price: root.querySelector("[data-price]"),
+        btn: root.querySelector(`button[data-buy-machine="${m.id}"]`)
+      });
+    }
+
+    // Tools
+    ui.tabTools.innerHTML = "";
+    for (const t of tools){
+      const root = document.createElement("div");
+      root.className = "item";
+      root.innerHTML = `
+        <div class="left">
+          <div class="name">${t.name} <span class="badge" data-owned style="display:none;">Owned</span></div>
+          <div class="desc">${t.desc}</div>
+        </div>
+        <div class="priceRow">
+          <span class="badge">${t.kind}</span>
+          <span class="price" data-price>${fmt(t.cost)}</span>
+          <button data-buy-tool="${t.id}">Buy</button>
+        </div>
+      `;
+      ui.tabTools.appendChild(root);
+
+      dom.tool.set(t.id, {
+        root,
+        owned: root.querySelector("[data-owned]"),
+        price: root.querySelector("[data-price]"),
+        btn: root.querySelector(`button[data-buy-tool="${t.id}"]`)
+      });
+    }
+  }
+
+  function updateShopState(){
+    const mult = currentMult();
+    const machineMult = hasTool("union") ? 1.15 : 1.0;
+
+    // Machines: update cost, owned, canBuy class, button label
+    for (const m of machines){
+      const el = dom.machine.get(m.id);
+      const owned = S.machinesOwned[m.id] || 0;
+      const cost = machineCost(m);
+      const canBuy = S.dust >= cost;
+
+      el.owned.textContent = `Owned: ${owned}`;
+      el.price.textContent = fmt(cost);
+      el.prod.textContent = fmt(m.baseDps * machineMult * mult);
+
+      el.btn.textContent = canBuy ? "Buy" : "Need";
+      // do NOT disable (keeps click feel consistent), just style affordably
+      el.root.classList.toggle("canBuy", canBuy);
+      el.root.classList.toggle("pulse", canBuy);
+    }
+
+    // Tools: update owned/canBuy, and disable when owned
+    for (const t of tools){
+      const el = dom.tool.get(t.id);
+      const owned = hasTool(t.id);
+      const canBuy = !owned && S.dust >= t.cost;
+
+      el.price.textContent = fmt(t.cost);
+      el.btn.textContent = owned ? "Owned" : (canBuy ? "Buy" : "Need");
+      el.btn.disabled = owned;
+
+      el.owned.style.display = owned ? "inline-block" : "none";
+
+      el.root.classList.toggle("canBuy", canBuy);
+      el.root.classList.toggle("pulse", canBuy);
+    }
+  }
+
+  // ---------- Tabs ----------
+  let activeTab = "machines";
+  function setTab(tab){
+    activeTab = tab;
+    document.querySelectorAll(".tabBtn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    $("tab_machines").style.display = tab === "machines" ? "flex" : "none";
+    $("tab_tools").style.display = tab === "tools" ? "flex" : "none";
+    $("tab_achievements").style.display = tab === "achievements" ? "block" : "none";
+    $("tab_log").style.display = tab === "log" ? "block" : "none";
+  }
+
+  // ---------- Achievements ----------
+  function unlockAch(a){
+    if (S.achUnlocked[a.id]) return;
+    S.achUnlocked[a.id] = true;
+    S.achBonusMult *= a.bonus;
+    toast("Achievement!", a.name);
+    addLog("gold", "Achievement", `${a.name} (+${Math.round((a.bonus-1)*100)}% production)`);
+  }
+  function checkAchievements(){
+    for (const a of achievements){
+      if (!S.achUnlocked[a.id] && a.check()) unlockAch(a);
+    }
+  }
+  function renderAchievements(){
+    ui.achList.innerHTML = "";
+    for (const a of achievements){
+      const unlocked = !!S.achUnlocked[a.id];
+      const row = document.createElement("div");
+      row.className = "item";
+      row.innerHTML = `
+        <div class="left">
+          <div class="name">${unlocked ? "🏆" : "🔒"} ${a.name} ${unlocked ? '<span class="badge owned">Unlocked</span>' : ''}</div>
+          <div class="desc">${a.desc} <span class="small">Bonus: +${Math.round((a.bonus-1)*100)}%</span></div>
+        </div>
+        <div class="priceRow"><span class="badge">${unlocked ? "done" : "pending"}</span></div>
+      `;
+      ui.achList.appendChild(row);
+    }
+  }
+
+  // ---------- Buying ----------
+  function buyTool(id){
+    const t = tools.find(x => x.id === id);
+    if (!t) return false;
+    if (hasTool(id)) return false;
+    if (S.dust < t.cost) return false;
+
+    S.dust -= t.cost;
+    S.toolsOwned[id] = true;
+    t.apply();
+
+    addLog("gold", "Tool", `Unlocked: ${t.name}`);
+    toast("Tool unlocked", t.name);
+    saveDebounced();
+    return true;
+  }
+
+  function buyMachine(id){
+    const m = machines.find(x => x.id === id);
+    if (!m) return false;
+
+    const cost = machineCost(m);
+    if (S.dust < cost) return false;
+
+    S.dust -= cost;
+    S.machinesOwned[id] = (S.machinesOwned[id] || 0) + 1;
+
+    addLog("good", "Machine", `Built 1× ${m.name}.`);
+    toast("Built", m.name);
+    saveDebounced();
+    return true;
+  }
+
+  // ✅ Stable event delegation (works forever, because shop DOM never gets replaced)
+  document.addEventListener("click", (e) => {
+    const toolBtn = e.target.closest("button[data-buy-tool]");
+    if (toolBtn){
+      const id = toolBtn.getAttribute("data-buy-tool");
+      const ok = buyTool(id);
+      if (!ok && !hasTool(id)) toast("Not enough Stardust", "Click more or buy machines first.");
+      return;
+    }
+
+    const machineBtn = e.target.closest("button[data-buy-machine]");
+    if (machineBtn){
+      const id = machineBtn.getAttribute("data-buy-machine");
+      const ok = buyMachine(id);
+      if (!ok) toast("Not enough Stardust", "Wait a moment or click more.");
+      return;
+    }
+  });
+
+  // ---------- Clicking ----------
+  function floatText(text, clientX, clientY, color){
+    const rect = $("orb").getBoundingClientRect();
+    const x = clamp(clientX - rect.left, 10, rect.width - 10);
+    const y = clamp(clientY - rect.top, 10, rect.height - 10);
+
+    const el = document.createElement("div");
+    el.className = "float";
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+    el.style.color = color;
+    $("orb").parentElement.appendChild(el);
+    el.textContent = text;
+    setTimeout(() => el.remove(), 900);
+  }
+
+  function doClick(clientX, clientY){
+    const t = now();
+    if (t - S.lastClickAt <= 900) S.clickCombo += 1;
+    else S.clickCombo = 1;
+    S.lastClickAt = t;
+
+    const amount = clickValue();
+    S.dust += amount;
+    S.totalDust += amount;
+
+    const ocGain = clamp(2 + Math.min(6, S.clickCombo * 0.3), 2, 7);
+    S.overcharge = clamp(S.overcharge + ocGain, 0, 100);
+
+    floatText("+" + fmt(amount), clientX, clientY, "var(--cyan)");
+
+    if (S.overcharge >= 100){
+      const burst = starburstValue();
+      S.overcharge = 0;
+      S.dust += burst;
+      S.totalDust += burst;
+      S.achUnlocked._bursts = (S.achUnlocked._bursts || 0) + 1;
+
+      floatText("STARBURST +" + fmt(burst), clientX, clientY - 18, "var(--gold)");
+      toast("Starburst!", `+${fmt(burst)} Stardust`);
+      addLog("gold", "Starburst", `A starburst detonated. (+${fmt(burst)})`);
+    }
+
+    checkAchievements();
+    saveDebounced();
+  }
+
+  const orb = $("orb");
+  orb.addEventListener("pointerdown", (e) => {
+    orb.setPointerCapture?.(e.pointerId);
+    doClick(e.clientX, e.clientY);
+    startHold();
+  });
+
+  let hold = false;
+  let holdTimer = null;
+
+  function startHold(){
+    hold = true;
+    const repeat = () => {
+      if (!hold) return;
+      const r = orb.getBoundingClientRect();
+      doClick(r.left + r.width/2, r.top + r.height/2);
+      holdTimer = setTimeout(repeat, 90);
+    };
+    holdTimer = setTimeout(repeat, 220);
+  }
+
+  window.addEventListener("pointerup", () => {
+    hold = false;
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+  });
+
+  // ---------- Starboost ----------
+  function starboostCooldownMs(){
+    const base = 120000;
+    return hasTool("boostCool") ? Math.floor(base * 0.75) : base;
+  }
+  function canStarboost(){
+    return now() >= S.starboostReadyAt && now() >= S.starboostUntil;
+  }
+  function activateStarboost(){
+    if (!canStarboost()) return;
+    S.starboostUntil = now() + 30000;
+    S.starboostReadyAt = now() + starboostCooldownMs();
+    toast("Starboost!", "2× production for 30s.");
+    addLog("purple", "Starboost", "2× production for 30 seconds.");
+    saveDebounced();
+  }
+  $("boostBtn").addEventListener("click", activateStarboost);
+
+  // ---------- Cosmic Events ----------
+  let cosmicTimer = 0;
+  function maybeCosmicEvent(){
+    if (S.cosmicEvent && now() < S.cosmicEvent.until) return;
+    if (Math.random() > 0.12) return;
+
+    const events = [
+      { name:"Meteor Shower", mult: 1.6, sub:"+60% to all production for ~25s.", dur: 25000 },
+      { name:"Time Ripple", mult: 1.35, sub:"+35% to all production for ~22s.", dur: 22000 },
+      { name:"Lucky Alignment", mult: 2.1, sub:"2.1× to all production for ~20s.", dur: 20000 },
+    ];
+    const e = pick(events);
+    S.cosmicEvent = { name: e.name, mult: e.mult, until: now() + e.dur, sub: e.sub };
+
+    $("eventBanner").style.display = "block";
+    $("eventTxt").textContent = e.name;
+    $("eventSub").textContent = e.sub;
+    S.achUnlocked._eventSeen = true;
+
+    toast("Cosmic Event!", e.name);
+    addLog("gold", "Cosmic Event", `${e.name} started. (${e.sub})`);
+    saveDebounced();
+  }
+
+  function updateEventBanner(){
+    if (S.cosmicEvent && now() < S.cosmicEvent.until){
+      $("eventBanner").style.display = "block";
+      $("eventTxt").textContent = S.cosmicEvent.name;
+      $("eventSub").textContent = S.cosmicEvent.sub || "";
+    } else {
+      S.cosmicEvent = null;
+      $("eventBanner").style.display = "none";
+    }
+  }
+
+  // ---------- Save / Load ----------
+  const SAVE_KEY = "starforger_clicker_save_v3";
+
+  function save(){
+    const payload = { S, t: now(), version: 3 };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+  }
+
+  let saveTimer = null;
+  function saveDebounced(){
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      save();
+    }, 300);
+  }
+
+  function load(){
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw){
+      toast("No save found", "Play a bit, then hit Save.");
+      return;
+    }
+    const payload = JSON.parse(raw);
+    if (!payload || !payload.S){
+      toast("Save corrupted", "Starting fresh.");
+      S = structuredClone(BASE);
+      return;
+    }
+    S = payload.S;
+
+    // patch missing fields
+    for (const k of Object.keys(BASE)){
+      if (typeof S[k] === "undefined") S[k] = structuredClone(BASE)[k];
+    }
+    if (!S.toolsOwned) S.toolsOwned = {};
+    if (!S.machinesOwned) S.machinesOwned = {};
+    if (!S.achUnlocked) S.achUnlocked = {};
+    if (!S.achBonusMult) S.achBonusMult = 1.0;
+
+    // offline gains (passive only)
+    const elapsed = Math.max(0, Math.floor((now() - (payload.t||now()))/1000));
+    if (elapsed > 3){
+      const gain = baseMachineDps() * currentMult() * elapsed;
+      if (gain > 0){
+        S.dust += gain;
+        S.totalDust += gain;
+        addLog("good", "Offline", `While you were gone (${elapsed}s), +${fmt(gain)} Stardust.`);
+        toast("Offline gains", `+${fmt(gain)} Stardust`);
+      }
+    }
+
+    updateEventBanner();
+    checkAchievements();
+    toast("Loaded", "Welcome back.");
+  }
+
+  function hardReset(){
+    if (!confirm("Reset the entire game? This erases your save.")) return;
+    localStorage.removeItem(SAVE_KEY);
+    S = structuredClone(BASE);
+    logEntries.length = 0;
+    $("eventBanner").style.display = "none";
+    toast("Reset", "All progress cleared.");
+  }
+
+  $("saveBtn").addEventListener("click", () => { save(); toast("Saved", "Stored in your browser."); addLog("good","Save","Game saved locally."); });
+  $("loadBtn").addEventListener("click", load);
+  $("resetBtn").addEventListener("click", hardReset);
+
+  // ---------- Prestige ----------
+  function shardsFromReboot(){
+    const val = Math.floor(Math.pow(S.totalDust / 5000, 0.55));
+    return Math.max(0, val);
+  }
+  function reboot(){
+    const gain = shardsFromReboot();
+    if (gain <= 0){
+      toast("Too soon", "Forge more Stardust before rebooting.");
+      return;
+    }
+    if (!confirm(`Reboot resets this run and grants +${gain} shards permanently. Continue?`)) return;
+
+    const keep = S.shards + gain;
+    addLog("purple", "Reboot", `Reality rebooted. +${gain} shards.`);
+    toast("Rebooted", `+${gain} shards gained.`);
+
+    S = structuredClone(BASE);
+    S.shards = keep;
+    S.dust = 10 + S.shards * 2;
+    S.totalDust = S.dust;
+
+    $("eventBanner").style.display = "none";
+    save();
+  }
+  $("rebootBtn").addEventListener("click", reboot);
+
+  // ---------- Rendering ----------
+  function renderTop(){
+    const mult = currentMult();
+    const dps = baseMachineDps() * mult;
+    const dpc = clickValue();
+
+    ui.dustTxt.textContent = fmt(S.dust);
+    ui.bigDust.textContent = `${fmt(S.dust)} Stardust`;
+    ui.dpsTxt.textContent = fmt(dps);
+    ui.dpcTxt.textContent = fmt(dpc);
+    ui.rateTxt.textContent = `${fmt(dps)} per second • ${fmt(dpc)} per click`;
+
+    ui.overTxt.textContent = `${Math.floor(S.overcharge)}%`;
+    ui.overFill.style.width = `${S.overcharge}%`;
+
+    ui.shardsTxt.textContent = S.shards;
+    ui.achCountTxt.textContent = Object.keys(S.achUnlocked).filter(k => !k.startsWith("_")).length;
+
+    const btn = $("boostBtn");
+    if (now() < S.starboostUntil){
+      const left = Math.ceil((S.starboostUntil - now())/1000);
+      ui.boostTxt.textContent = `${left}s active`;
+      btn.disabled = true;
+    } else if (now() < S.starboostReadyAt){
+      const left = Math.ceil((S.starboostReadyAt - now())/1000);
+      ui.boostTxt.textContent = `${left}s cooldown`;
+      btn.disabled = true;
+    } else {
+      ui.boostTxt.textContent = "ready";
+      btn.disabled = false;
+    }
+  }
+
+  // ---------- Main Loop ----------
+  let last = now();
+  function tick(){
+    const t = now();
+    const dt = Math.min(0.25, (t - last) / 1000);
+    last = t;
+
+    // passive
+    const gain = baseMachineDps() * currentMult() * dt;
+    if (gain > 0){
+      S.dust += gain;
+      S.totalDust += gain;
+    }
+
+    // combo decay
+    if (t - S.lastClickAt > 1300) S.clickCombo = 0;
+
+    // cosmic event check
+    cosmicTimer += dt;
+    if (cosmicTimer >= 20){
+      cosmicTimer = 0;
+      maybeCosmicEvent();
+    }
+    if (S.cosmicEvent && t >= S.cosmicEvent.until){
+      updateEventBanner();
+    }
+
+    checkAchievements();
+
+    // render
+    renderTop();
+    updateShopState();
+    if (activeTab === "achievements") renderAchievements();
+
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- Tabs + clear log ----------
+  document.querySelectorAll(".tabBtn").forEach(btn => {
+    btn.addEventListener("click", () => setTab(btn.dataset.tab));
+  });
+  $("clearLogBtn").addEventListener("click", () => {
+    logEntries.length = 0;
+    addLog("good","Log","Cleared.");
+  });
+
+  // ---------- Init ----------
+  buildShopOnce();
+  setTab("machines"); // ✅ machines first
+  addLog("good", "Welcome", "Click the orb to forge Stardust. Buy Machines for DPS, then Tools for buffs.");
+  updateEventBanner();
+  renderTop();
+  updateShopState();
+  requestAnimationFrame(tick);
+
+  if (localStorage.getItem(SAVE_KEY)) {
+    toast("Tip", "You have a save already. Hit Load if you want it.");
+  }
+})();
+</script>
+</body>
+</html>
+
+
