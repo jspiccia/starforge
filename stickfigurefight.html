@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Stick Fighter: Powers & Shop (Single-File)</title>
+  <title>Stick Fighter: Melee Levels 1-50</title>
   <style>
     html, body { margin:0; height:100%; background:#0b0f17; color:#e8eefc; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     #wrap { display:grid; grid-template-columns: 1fr 320px; height:100%; }
@@ -61,13 +61,12 @@
     <div class="row">
       <span class="pill">Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
       <span class="pill">Punch: <kbd>Space</kbd></span>
-      <span class="pill">Shoot: <kbd>Mouse</kbd></span>
+      <span class="pill">Kick: <kbd>K</kbd></span>
     </div>
 
     <div class="row">
       <span class="pill">Dash: <kbd>F</kbd></span>
       <span class="pill">Tree: <kbd>R</kbd></span>
-      <span class="pill">Blast: <kbd>Q</kbd></span>
       <span class="pill">Shield: <kbd>E</kbd></span>
     </div>
 
@@ -79,19 +78,19 @@
         <div class="bar red"><div id="hpBar"></div></div>
       </div>
       <div style="flex:1">
-        <div class="tiny">XP / Points</div>
+        <div class="tiny">Level progress</div>
         <div class="bar"><div id="xpBar"></div></div>
       </div>
     </div>
 
     <div class="row">
       <span class="pill">Points: <b id="points">0</b></span>
-      <span class="pill">Wave: <b id="wave">1</b></span>
+      <span class="pill">Level: <b id="wave">1</b> / 50</span>
       <span class="pill">Kills: <b id="kills">0</b></span>
     </div>
 
-    <div class="muted">
-      Defeat NPCs to earn points. Buy abilities below. Powerups randomly spawn: <span class="good">Heal</span>, <span class="warn">Damage+</span>, <span class="good">Speed+</span>.
+    <div class="muted" id="shopHint">
+      Defeat all enemies to pass. Buy upgrades only between levels (after pass or lose). Points never reset.
     </div>
 
     <div class="shop">
@@ -108,12 +107,6 @@
       </div>
 
       <div class="card">
-        <h2>Energy Blast (<kbd>Q</kbd>)</h2>
-        <div class="muted">Strong ranged shot. Cooldown 2.5s.</div>
-        <button id="buyBlast">Buy Blast (40)</button>
-      </div>
-
-      <div class="card">
         <h2>Shield (<kbd>E</kbd>)</h2>
         <div class="muted">Reduces damage for 3s. Cooldown 7.0s.</div>
         <button id="buyShield">Buy Shield (45)</button>
@@ -127,7 +120,7 @@
 
       <div class="card">
         <h2>Upgrade: Damage</h2>
-        <div class="muted">Increase melee + projectile damage (stacks).</div>
+        <div class="muted">Increase punch/kick damage (stacks).</div>
         <button id="buyDmg">Buy +2 Damage (30)</button>
       </div>
 
@@ -138,8 +131,8 @@
       </div>
 
       <div class="sep"></div>
-      <div class="muted hint">
-        Tip: If you die, press <kbd>Enter</kbd> to restart.
+      <div class="muted hint" id="betweenLevelsHint">
+        Shop is only open when you pass or fail a level. Points are kept forever.
       </div>
     </div>
   </div>
@@ -171,7 +164,11 @@
   window.addEventListener('keydown', (e) => {
     if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
     keys.add(e.key.toLowerCase());
-    if (e.key === 'Enter' && state.gameOver) resetGame();
+    if (e.key === 'Enter') {
+      if (state.gameOver) retryLevel();
+      else if (state.levelComplete) nextLevel();
+      else if (!state.playing && state.killsThisLevel === 0 && !state.levelComplete) startLevel();
+    }
   });
   window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
@@ -198,51 +195,107 @@
 
   // ---------- Game State ----------
   const state = {
-    points: 0,
-    kills: 0,
-    wave: 1,
-    gameOver: false,
+    points: 0,           // never reset; only spent in shop
+    level: 1,           // 1 to 50
+    killsThisLevel: 0,
+    levelKillTarget: 0, // set per level
+    gameOver: false,    // died this level
+    levelComplete: false,
+    playing: false,     // false = between levels, shop open
     lastTime: 0,
     spawnTimer: 0,
     powerTimer: 0,
     messageTimer: 0,
     message: "",
-    // progression-ish: fill bar as you get points
-    xp: 0,
-    xpNeed: 50,
   };
 
   // Entities
-  let player, enemies, bullets, obstacles, powerups, particles;
+  let player, enemies, obstacles, powerups, particles;
 
-  // Shop / Abilities (locked until bought)
+  // Shop / Abilities (locked until bought); only purchasable when !state.playing
   const abilities = {
     dash: { owned: false, cd: 2.0, t: 0 },
     tree: { owned: false, cd: 5.0, t: 0 },
-    blast:{ owned: false, cd: 2.5, t: 0 },
     shield:{ owned: false, cd: 7.0, t: 0, active: 0 },
   };
 
-  // ---------- Init / Reset ----------
-  function resetGame() {
-    state.points = 0;
-    state.kills = 0;
-    state.wave = 1;
+  // ---------- Level / Game Flow ----------
+  const MAX_LEVEL = 50;
+
+  function startLevel() {
+    state.playing = true;
     state.gameOver = false;
+    state.levelComplete = false;
+    state.killsThisLevel = 0;
     state.spawnTimer = 0;
     state.powerTimer = 0;
     state.messageTimer = 0;
     state.message = "";
-    state.xp = 0;
-    state.xpNeed = 50;
+    // kill target for this level
+    state.levelKillTarget = 2 + Math.floor(state.level * 1.4);
 
-    // reset abilities but keep purchases? For now: keep purchases across restarts? You probably want reset all:
-    abilities.dash.owned = false;
-    abilities.tree.owned = false;
-    abilities.blast.owned = false;
-    abilities.shield.owned = false;
-    abilities.shield.active = 0;
     for (const k in abilities) abilities[k].t = 0;
+    abilities.shield.active = 0;
+
+    const cw = canvas.clientWidth || 800;
+    const ch = canvas.clientHeight || 500;
+    const prev = player;
+    player = {
+      x: cw * 0.25, y: ch * 0.5,
+      vx: 0, vy: 0,
+      r: 16,
+      hp: prev ? prev.maxHp : 100,
+      maxHp: prev ? prev.maxHp : 100,
+      speed: prev ? prev.speed : 2.2,
+      dmg: prev ? prev.dmg : 6,
+      facing: 1,
+      invuln: 0,
+      punchT: 0,
+      kickT: 0,
+      dmgBoost: 0,
+      speedBoost: 0,
+    };
+
+    enemies = [];
+    obstacles = [];
+    powerups = [];
+    particles = [];
+
+    syncShopButtons();
+    // spawn first enemies
+    for (let i = 0; i < Math.min(2, state.levelKillTarget); i++) spawnEnemy();
+  }
+
+  function endLevel(won) {
+    state.playing = false;
+    if (won) state.levelComplete = true;
+    else state.gameOver = true;
+    syncShopButtons();
+  }
+
+  function nextLevel() {
+    if (state.level < MAX_LEVEL) {
+      state.level += 1;
+      startLevel();
+    }
+  }
+
+  function retryLevel() {
+    startLevel();
+  }
+
+  function resetGame() {
+    // Full reset: level 1, but POINTS and ability purchases are kept (points never reset)
+    state.level = 1;
+    state.gameOver = false;
+    state.levelComplete = false;
+    state.playing = false;
+    state.killsThisLevel = 0;
+    state.levelKillTarget = 0;
+    state.spawnTimer = 0;
+    state.powerTimer = 0;
+    state.messageTimer = 0;
+    state.message = "";
 
     player = {
       x: 200, y: 240,
@@ -255,13 +308,12 @@
       facing: 1,
       invuln: 0,
       punchT: 0,
-      shootCd: 0,
+      kickT: 0,
       dmgBoost: 0,
       speedBoost: 0,
     };
 
     enemies = [];
-    bullets = [];
     obstacles = [];
     powerups = [];
     particles = [];
@@ -273,7 +325,7 @@
   function canAfford(cost) { return state.points >= cost; }
 
   function buy(cost, onBuy) {
-    if (state.gameOver) return;
+    if (state.playing) return; // shop only when between levels
     if (!canAfford(cost)) { ping("Not enough points."); return; }
     state.points -= cost;
     onBuy();
@@ -285,39 +337,34 @@
   function syncShopButtons() {
     const bDash = document.getElementById('buyDash');
     const bTree = document.getElementById('buyTree');
-    const bBlast = document.getElementById('buyBlast');
     const bShield = document.getElementById('buyShield');
     const bHP = document.getElementById('buyHP');
     const bDmg = document.getElementById('buyDmg');
     const bSpd = document.getElementById('buySpd');
     if (!bDash) return;
 
+    const shopOpen = !state.playing;
     bDash.textContent = abilities.dash.owned ? "Owned" : "Buy Dash (25)";
     bTree.textContent = abilities.tree.owned ? "Owned" : "Buy Tree (35)";
-    bBlast.textContent = abilities.blast.owned ? "Owned" : "Buy Blast (40)";
     bShield.textContent = abilities.shield.owned ? "Owned" : "Buy Shield (45)";
 
-    bDash.disabled = abilities.dash.owned || !canAfford(25);
-    bTree.disabled = abilities.tree.owned || !canAfford(35);
-    bBlast.disabled = abilities.blast.owned || !canAfford(40);
-    bShield.disabled = abilities.shield.owned || !canAfford(45);
-
-    bHP.disabled = !canAfford(30);
-    bDmg.disabled = !canAfford(30);
-    bSpd.disabled = !canAfford(30);
+    bDash.disabled = !shopOpen || abilities.dash.owned || !canAfford(25);
+    bTree.disabled = !shopOpen || abilities.tree.owned || !canAfford(35);
+    bShield.disabled = !shopOpen || abilities.shield.owned || !canAfford(45);
+    bHP.disabled = !shopOpen || !canAfford(30);
+    bDmg.disabled = !shopOpen || !canAfford(30);
+    bSpd.disabled = !shopOpen || !canAfford(30);
   }
 
   function setupShop() {
     const buyDashBtn = document.getElementById('buyDash');
     const buyTreeBtn = document.getElementById('buyTree');
-    const buyBlastBtn = document.getElementById('buyBlast');
     const buyShieldBtn = document.getElementById('buyShield');
     const buyHPBtn = document.getElementById('buyHP');
     const buyDmgBtn = document.getElementById('buyDmg');
     const buySpdBtn = document.getElementById('buySpd');
     if (buyDashBtn) buyDashBtn.onclick = () => buy(25, () => { abilities.dash.owned = true; });
     if (buyTreeBtn) buyTreeBtn.onclick = () => buy(35, () => { abilities.tree.owned = true; });
-    if (buyBlastBtn) buyBlastBtn.onclick = () => buy(40, () => { abilities.blast.owned = true; });
     if (buyShieldBtn) buyShieldBtn.onclick = () => buy(45, () => { abilities.shield.owned = true; });
     if (buyHPBtn) buyHPBtn.onclick = () => buy(30, () => { if (player) { player.maxHp += 20; player.hp += 20; } });
     if (buyDmgBtn) buyDmgBtn.onclick = () => buy(30, () => { if (player) player.dmg += 2; });
@@ -331,7 +378,7 @@
   }
 
   // ---------- Spawning ----------
-  // NPCs scale with wave AND progress into the level (xp within current wave) so they get stronger the deeper you go
+  // Melee-only NPCs; combo length and speed scale with level (1 = single punch, 50 = 4-hit combos)
   function spawnEnemy() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     const side = Math.floor(Math.random()*4);
@@ -341,15 +388,18 @@
     if (side === 2) { x = Math.random()*w; y = -30; }
     if (side === 3) { x = Math.random()*w; y = h+30; }
 
-    const wave = state.wave;
-    // progress within current wave (0 to 1) - later spawns in a wave are tougher
-    const progressInWave = Math.min(1, state.xpNeed > 0 ? state.xp / state.xpNeed : 0);
-    const progressMult = 1 + 0.25 * progressInWave; // up to 25% stronger at end of wave
-
-    const hpBase = Math.floor((22 + wave * 5 + Math.floor(wave * 0.5)) * progressMult);
-    const speedBase = (1.1 + Math.min(2.2, wave * 0.14)) * (1 + 0.12 * progressInWave);
-    const dmgBase = (6 + Math.min(16, wave * 0.9)) * progressMult;
-    const rangedChance = Math.min(0.55, 0.12 + wave * 0.035 + progressInWave * 0.1);
+    const lvl = state.level;
+    const hpBase = Math.floor(20 + lvl * 4);
+    const speedBase = 1.0 + Math.min(1.8, lvl * 0.04);
+    const dmgBase = 4 + Math.min(14, lvl * 0.35);
+    // Combo: 1 = single punch only; 50 = up to 4-hit punch/kick combos
+    const comboLen = Math.min(4, 1 + Math.floor(lvl / 15));
+    const combo = [];
+    for (let i = 0; i < comboLen; i++) {
+      combo.push(Math.random() < 0.5 ? "punch" : "kick");
+    }
+    // Attack cooldown: higher level = faster recovery (more advanced)
+    const atkCdBase = Math.max(0.25, 0.7 - lvl * 0.008);
 
     enemies.push({
       x, y,
@@ -361,8 +411,11 @@
       dmg: dmgBase,
       atkCd: 0,
       stun: 0,
-      type: (Math.random() < rangedChance) ? "ranged" : "melee",
-      shootCd: 0,
+      combo,
+      comboIndex: 0,
+      atkCdBase,
+      attackT: 0,   // windup for current attack
+      attackType: null, // "punch" | "kick"
     });
   }
 
@@ -388,24 +441,13 @@
     });
   }
 
-  // ---------- Combat ----------
-  function shoot(from, tx, ty, speed, dmg, colorHint) {
-    const dx = tx - from.x, dy = ty - from.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = dx/len, uy = dy/len;
-    bullets.push({
-      x: from.x, y: from.y,
-      vx: ux*speed, vy: uy*speed,
-      r: 4,
-      dmg,
-      ttl: 2.0,
-      owner: from === player ? "player" : "enemy",
-      hint: colorHint || "normal",
-    });
-  }
-
+  // ---------- Combat (melee only) ----------
   function doPunch() {
     player.punchT = 0.16;
+  }
+
+  function doKick() {
+    player.kickT = 0.22; // slightly longer active window
   }
 
   function damageEntity(ent, amount) {
@@ -486,20 +528,6 @@
     ctx.restore();
   }
 
-  function drawBullet(b) {
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.globalAlpha = 0.9;
-    ctx.beginPath();
-    ctx.arc(0, 0, b.r, 0, Math.PI*2);
-    let col = "rgba(220,240,255,0.9)";
-    if (b.owner === "enemy") col = "rgba(255,190,190,0.9)";
-    if (b.hint === "blast") col = "rgba(255,235,170,0.95)";
-    ctx.fillStyle = col;
-    ctx.fill();
-    ctx.restore();
-  }
-
   function spawnHitParticles(x,y, n=10) {
     for (let i=0;i<n;i++) {
       particles.push({
@@ -530,12 +558,23 @@
 
   // ---------- Game Logic ----------
   function update(dt) {
-    if (state.gameOver) return;
+    state.messageTimer = Math.max(0, state.messageTimer - dt);
+    elPoints.textContent = String(state.points);
+    elWave.textContent = String(state.level);
+    elKills.textContent = String(state.killsThisLevel);
+    if (state.levelKillTarget > 0) {
+      xpBar.style.width = (100 * Math.min(1, state.killsThisLevel / state.levelKillTarget)).toFixed(1) + "%";
+    }
+
+    if (!state.playing) {
+      syncShopButtons();
+      return;
+    }
 
     // cooldown timers
     player.invuln = Math.max(0, player.invuln - dt);
     player.punchT = Math.max(0, player.punchT - dt);
-    player.shootCd = Math.max(0, player.shootCd - dt);
+    player.kickT = Math.max(0, player.kickT - dt);
     player.dmgBoost = Math.max(0, player.dmgBoost - dt);
     player.speedBoost = Math.max(0, player.speedBoost - dt);
 
@@ -557,11 +596,9 @@
 
     if (ax !== 0) player.facing = ax > 0 ? 1 : -1;
 
-    // abilities input
-    if (keys.has(' ')) { // punch
-      // only trigger when not already punching
-      if (player.punchT <= 0) doPunch();
-    }
+    // melee input: punch (Space), kick (K)
+    if (keys.has(' ') && player.punchT <= 0 && player.kickT <= 0) doPunch();
+    if (keys.has('k') && player.punchT <= 0 && player.kickT <= 0) doKick();
 
     if (keys.has('f') && abilities.dash.owned && abilities.dash.t <= 0) {
       abilities.dash.t = abilities.dash.cd;
@@ -580,21 +617,10 @@
       ping("Tree!");
     }
 
-    if (keys.has('q') && abilities.blast.owned && abilities.blast.t <= 0) {
-      abilities.blast.t = abilities.blast.cd;
-      shoot(player, mouse.x, mouse.y, 520, player.dmg + 8 + (player.dmgBoost>0?3:0), "blast");
-    }
-
     if (keys.has('e') && abilities.shield.owned && abilities.shield.t <= 0) {
       abilities.shield.t = abilities.shield.cd;
       abilities.shield.active = 3.0;
       ping("Shield up!");
-    }
-
-    // basic shooting with mouse
-    if (mouse.down && player.shootCd <= 0) {
-      player.shootCd = 0.18;
-      shoot(player, mouse.x, mouse.y, 620, player.dmg + (player.dmgBoost>0?2:0), "normal");
     }
 
     // apply movement, bounds
@@ -622,47 +648,57 @@
     }
 
     // Punch hits enemies
+    const baseDmg = player.dmg + (player.dmgBoost > 0 ? 3 : 0);
     if (player.punchT > 0) {
       const punchRange = 34;
       const px = player.x + player.facing * 22;
       const py = player.y + 5;
       for (const e of enemies) {
-        if (dist2(px, py, e.x, e.y) < (punchRange*punchRange)) {
-          const dmg = player.dmg + (player.dmgBoost>0?3:0);
-          damageEntity(e, dmg * dt * 8.0); // scale by dt for continuous window
+        if (dist2(px, py, e.x, e.y) < (punchRange * punchRange)) {
+          damageEntity(e, baseDmg * dt * 8.0);
           e.stun = Math.max(e.stun, 0.08);
           spawnHitParticles(e.x, e.y, 2);
         }
       }
     }
+    // Kick hits enemies (slightly longer range, more damage)
+    if (player.kickT > 0) {
+      const kickRange = 40;
+      const kx = player.x + player.facing * 28;
+      const ky = player.y + 14;
+      for (const e of enemies) {
+        if (dist2(kx, ky, e.x, e.y) < (kickRange * kickRange)) {
+          damageEntity(e, (baseDmg + 2) * dt * 7.0);
+          e.stun = Math.max(e.stun, 0.12);
+          spawnHitParticles(e.x, e.y, 4);
+        }
+      }
+    }
 
-    // Enemy AI + attacks
+    // Enemy AI: melee only, combo punch/kick by level
     for (const e of enemies) {
       e.stun = Math.max(0, e.stun - dt);
       e.atkCd = Math.max(0, e.atkCd - dt);
-      e.shootCd = Math.max(0, e.shootCd - dt);
+      e.attackT = Math.max(0, e.attackT - dt);
 
       const dx = player.x - e.x, dy = player.y - e.y;
       const d = Math.hypot(dx, dy) || 1;
+      const facing = (player.x - e.x) >= 0 ? 1 : -1;
 
       if (e.stun <= 0) {
-        // avoid trees a bit: simple steering away if inside obstacle
-        let steerX = dx/d, steerY = dy/d;
-
+        let steerX = dx / d, steerY = dy / d;
         for (const o of obstacles) {
-          const eb = { x: e.x-e.r, y: e.y-e.r, w: e.r*2, h: e.r*2 };
+          const eb = { x: e.x - e.r, y: e.y - e.r, w: e.r * 2, h: e.r * 2 };
           if (rectsOverlap(eb, o)) {
-            // steer away from obstacle center
-            const cx = o.x + o.w/2, cy = o.y + o.h/2;
+            const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
             const odx = e.x - cx, ody = e.y - cy;
             const ol = Math.hypot(odx, ody) || 1;
-            steerX += (odx/ol)*1.4;
-            steerY += (ody/ol)*1.4;
+            steerX += (odx / ol) * 1.4;
+            steerY += (ody / ol) * 1.4;
           }
         }
         const sl = Math.hypot(steerX, steerY) || 1;
         steerX /= sl; steerY /= sl;
-
         e.vx = steerX * e.speed;
         e.vy = steerY * e.speed;
       } else {
@@ -672,82 +708,27 @@
       e.x += e.vx;
       e.y += e.vy;
 
-      // melee hit
-      if (e.type === "melee") {
-        if (d < 34 && e.atkCd <= 0) {
-          e.atkCd = 0.55;
-          let dmg = e.dmg;
-          if (abilities.shield.active > 0) dmg *= 0.55;
-          if (player.invuln <= 0) {
-            player.hp -= dmg;
-            player.invuln = 0.10;
-            spawnHitParticles(player.x, player.y, 10);
-          }
+      // Melee attack: start next in combo when in range and atkCd ready
+      if (e.attackT <= 0 && e.atkCd <= 0 && d < 38) {
+        e.attackType = e.combo[e.comboIndex];
+        e.attackT = 0.08 + (e.combo.length > 1 ? 0.02 : 0); // windup
+      }
+      // Deal damage once when windup ends
+      if (e.attackType && e.attackT <= 0 && d < 42) {
+        let dmg = e.attackType === "kick" ? e.dmg * 1.2 : e.dmg;
+        if (abilities.shield.active > 0) dmg *= 0.55;
+        if (player.invuln <= 0) {
+          player.hp -= dmg;
+          player.invuln = 0.12;
+          spawnHitParticles(player.x, player.y, 10);
         }
-      } else {
-        // ranged enemy (damage scales with wave)
-        if (d < 520 && e.shootCd <= 0) {
-          e.shootCd = Math.max(0.5, 1.0 - state.wave*0.03) + Math.random()*0.3;
-          const bulletDmg = 8 + Math.min(14, state.wave * 0.8);
-          shoot(e, player.x, player.y-10, 380, bulletDmg, "normal");
-        }
-        // keep a little distance
-        if (d < 150) { e.x -= (dx/d)*1.5; e.y -= (dy/d)*1.5; }
+        e.comboIndex = (e.comboIndex + 1) % e.combo.length;
+        e.atkCd = e.atkCdBase;
+        e.attackType = null;
       }
 
-      // bounds
-      e.x = clamp(e.x, -40, w+40);
-      e.y = clamp(e.y, -40, h+40);
-    }
-
-    // bullets update + collisions
-    for (let i=bullets.length-1;i>=0;i--) {
-      const b = bullets[i];
-      b.ttl -= dt;
-      if (b.ttl <= 0) { bullets.splice(i,1); continue; }
-
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-
-      // hit obstacles (trees)
-      let hitObstacle = false;
-      for (const o of obstacles) {
-        const bb = { x: b.x-b.r, y: b.y-b.r, w: b.r*2, h: b.r*2 };
-        if (rectsOverlap(bb, o)) { hitObstacle = true; break; }
-      }
-      if (hitObstacle) {
-        spawnHitParticles(b.x, b.y, 8);
-        bullets.splice(i,1);
-        continue;
-      }
-
-      // hit enemies / player
-      if (b.owner === "player") {
-        for (const e of enemies) {
-          if (dist2(b.x, b.y, e.x, e.y) < (e.r*e.r)) {
-            damageEntity(e, b.dmg);
-            spawnHitParticles(e.x, e.y, 10);
-            bullets.splice(i,1);
-            break;
-          }
-        }
-      } else {
-        if (dist2(b.x, b.y, player.x, player.y) < (player.r*player.r)) {
-          if (player.invuln <= 0) {
-            let dmg = b.dmg;
-            if (abilities.shield.active > 0) dmg *= 0.55;
-            player.hp -= dmg;
-            player.invuln = 0.10;
-            spawnHitParticles(player.x, player.y, 12);
-          }
-          bullets.splice(i,1);
-        }
-      }
-
-      // out of bounds
-      if (b.x < -80 || b.x > w+80 || b.y < -80 || b.y > h+80) {
-        bullets.splice(i,1);
-      }
+      e.x = clamp(e.x, -40, w + 40);
+      e.y = clamp(e.y, -40, h + 40);
     }
 
     // powerups update + pickup
@@ -770,36 +751,29 @@
       }
     }
 
-    // enemies death -> points
-    for (let i=enemies.length-1;i>=0;i--) {
+    // enemies death -> points (points never reset)
+    for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       if (e.hp <= 0) {
-        enemies.splice(i,1);
-        state.kills += 1;
-        const gain = 8 + Math.floor(state.wave*1.5);
+        enemies.splice(i, 1);
+        state.killsThisLevel += 1;
+        const gain = 5 + Math.floor(state.level * 1.2);
         state.points += gain;
-        state.xp += gain;
         spawnHitParticles(e.x, e.y, 22);
+        if (state.killsThisLevel >= state.levelKillTarget) {
+          endLevel(true);
+          ping("Level " + state.level + " complete!");
+        }
       }
     }
 
-    // wave progression
-    while (state.xp >= state.xpNeed) {
-      state.xp -= state.xpNeed;
-      state.wave += 1;
-      state.xpNeed = Math.floor(state.xpNeed * 1.18 + 12);
-      ping("Wave " + state.wave + "!");
-      // small heal on wave up
-      player.hp = Math.min(player.maxHp, player.hp + 12);
-    }
-
-    // spawn enemies (increasing rate)
-    const targetEnemies = 3 + Math.floor(state.wave*0.8);
+    // spawn enemies during level (until we have enough on screen)
+    const targetEnemies = 2 + Math.floor(state.level * 0.6);
     state.spawnTimer -= dt;
-    if (enemies.length < targetEnemies && state.spawnTimer <= 0) {
-      state.spawnTimer = Math.max(0.25, 1.1 - state.wave*0.04);
+    if (state.playing && enemies.length < targetEnemies && state.spawnTimer <= 0) {
+      state.spawnTimer = Math.max(0.3, 0.9 - state.level * 0.01);
       spawnEnemy();
-      if (Math.random() < 0.12) spawnEnemy();
+      if (state.level >= 15 && Math.random() < 0.2) spawnEnemy();
     }
 
     // spawn powerups
@@ -809,23 +783,13 @@
       if (powerups.length < 2) spawnPowerup();
     }
 
-    // lose condition
+    // lose condition (points kept; shop opens)
     if (player.hp <= 0) {
-      state.gameOver = true;
-      ping("Game Over — press Enter to restart");
+      endLevel(false);
+      ping("You died — buy upgrades, then press Enter to retry");
     }
 
-    // message timer
-    state.messageTimer = Math.max(0, state.messageTimer - dt);
-
-    // update UI
-    elPoints.textContent = String(state.points);
-    elWave.textContent = String(state.wave);
-    elKills.textContent = String(state.kills);
-
     hpBar.style.width = (100 * clamp(player.hp / player.maxHp, 0, 1)).toFixed(1) + "%";
-    xpBar.style.width = (100 * clamp(state.xp / state.xpNeed, 0, 1)).toFixed(1) + "%";
-
     syncShopButtons();
   }
 
@@ -849,9 +813,6 @@
     // powerups
     for (const p of powerups) drawPowerup(p);
 
-    // bullets
-    for (const b of bullets) drawBullet(b);
-
     // enemies
     for (const e of enemies) {
       const facing = (player.x - e.x) >= 0 ? 1 : -1;
@@ -872,13 +833,23 @@
       ctx.restore();
     }
 
-    // punch arc indicator
+    // punch / kick arc indicator
     if (player.punchT > 0) {
       ctx.save();
       ctx.globalAlpha = 0.35;
       ctx.beginPath();
       ctx.arc(player.x + player.facing*18, player.y+4, 18, 0, Math.PI*2);
       ctx.strokeStyle = "rgba(220,240,255,0.9)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (player.kickT > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.arc(player.x + player.facing*26, player.y+14, 16, 0, Math.PI*2);
+      ctx.strokeStyle = "rgba(255,200,120,0.9)";
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.restore();
@@ -898,7 +869,6 @@
     const cdLines = [];
     if (abilities.dash.owned) cdLines.push(`F Dash: ${abilities.dash.t.toFixed(1)}s`);
     if (abilities.tree.owned) cdLines.push(`R Tree: ${abilities.tree.t.toFixed(1)}s`);
-    if (abilities.blast.owned) cdLines.push(`Q Blast: ${abilities.blast.t.toFixed(1)}s`);
     if (abilities.shield.owned) cdLines.push(`E Shield: ${abilities.shield.t.toFixed(1)}s`);
     if (cdLines.length) {
       ctx.globalAlpha = 0.85;
@@ -914,19 +884,45 @@
       ctx.fillText(state.message, 18, 58);
     }
 
-    // game over overlay
-    if (state.gameOver) {
-      ctx.globalAlpha = 0.85;
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
+    // between-levels overlay: died or level complete
+    if (state.levelComplete) {
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
       ctx.fillRect(0,0,w,h);
       ctx.globalAlpha = 1;
-      ctx.fillStyle = "rgba(255,255,255,0.95)";
-      ctx.font = "28px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(166,255,203,0.95)";
+      ctx.font = "26px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("GAME OVER", w/2, h/2 - 24);
+      ctx.fillText("LEVEL " + state.level + " COMPLETE!", w/2, h/2 - 36);
       ctx.font = "14px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.fillText("Press Enter to restart", w/2, h/2 + 10);
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillText(state.level >= MAX_LEVEL ? "Max level reached. Press Enter to play again." : "Buy upgrades, then Press Enter for next level", w/2, h/2 + 4);
+      ctx.textAlign = "left";
+    } else if (state.gameOver) {
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(0,0,w,h);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(255,180,180,0.95)";
+      ctx.font = "26px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("YOU DIED", w/2, h/2 - 36);
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillText("Buy upgrades, then Press Enter to retry level", w/2, h/2 + 4);
+      ctx.textAlign = "left";
+    } else if (!state.playing && state.killsThisLevel === 0) {
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.fillRect(0,0,w,h);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = "18px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Level " + state.level + " / " + MAX_LEVEL, w/2, h/2 - 20);
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(232,238,252,0.85)";
+      ctx.fillText("Press Enter to start", w/2, h/2 + 10);
       ctx.textAlign = "left";
     }
 
