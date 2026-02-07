@@ -125,6 +125,12 @@
       </div>
 
       <div class="card">
+        <h2>Axe</h2>
+        <div class="muted">+5 damage per punch/kick (stacks).</div>
+        <button id="buyAxe">Buy Axe (40)</button>
+      </div>
+
+      <div class="card">
         <h2>Upgrade: Move Speed</h2>
         <div class="muted">Run faster (stacks).</div>
         <button id="buySpd">Buy +0.2 Speed (30)</button>
@@ -252,8 +258,11 @@
       invuln: 0,
       punchT: 0,
       kickT: 0,
+      punchCd: 0,
+      kickCd: 0,
       dmgBoost: 0,
       speedBoost: 0,
+      axeBonus: prev ? (prev.axeBonus || 0) : 0,
     };
 
     enemies = [];
@@ -309,8 +318,11 @@
       invuln: 0,
       punchT: 0,
       kickT: 0,
+      punchCd: 0,
+      kickCd: 0,
       dmgBoost: 0,
       speedBoost: 0,
+      axeBonus: 0,
     };
 
     enemies = [];
@@ -340,6 +352,7 @@
     const bShield = document.getElementById('buyShield');
     const bHP = document.getElementById('buyHP');
     const bDmg = document.getElementById('buyDmg');
+    const bAxe = document.getElementById('buyAxe');
     const bSpd = document.getElementById('buySpd');
     if (!bDash) return;
 
@@ -353,6 +366,10 @@
     bShield.disabled = !shopOpen || abilities.shield.owned || !canAfford(45);
     bHP.disabled = !shopOpen || !canAfford(30);
     bDmg.disabled = !shopOpen || !canAfford(30);
+    if (bAxe) {
+      bAxe.textContent = "Buy Axe (40)";
+      bAxe.disabled = !shopOpen || !canAfford(40);
+    }
     bSpd.disabled = !shopOpen || !canAfford(30);
   }
 
@@ -368,6 +385,8 @@
     if (buyShieldBtn) buyShieldBtn.onclick = () => buy(45, () => { abilities.shield.owned = true; });
     if (buyHPBtn) buyHPBtn.onclick = () => buy(30, () => { if (player) { player.maxHp += 20; player.hp += 20; } });
     if (buyDmgBtn) buyDmgBtn.onclick = () => buy(30, () => { if (player) player.dmg += 2; });
+    const buyAxeBtn = document.getElementById('buyAxe');
+    if (buyAxeBtn) buyAxeBtn.onclick = () => buy(40, () => { if (player) player.axeBonus = (player.axeBonus || 0) + 5; });
     if (buySpdBtn) buySpdBtn.onclick = () => buy(30, () => { if (player) player.speed += 0.2; });
   }
 
@@ -442,12 +461,21 @@
   }
 
   // ---------- Combat (melee only) ----------
+  const PUNCH_ANIM = 0.16;
+  const PUNCH_CD = 0.42;   // delay before next punch (can't hold to spam)
+  const KICK_ANIM = 0.22;
+  const KICK_CD = 0.5;     // delay before next kick
+
   function doPunch() {
-    player.punchT = 0.16;
+    if (player.punchCd > 0 || player.kickCd > 0) return;
+    player.punchT = PUNCH_ANIM;
+    player.punchCd = PUNCH_CD;
   }
 
   function doKick() {
-    player.kickT = 0.22; // slightly longer active window
+    if (player.kickCd > 0 || player.punchCd > 0) return;
+    player.kickT = KICK_ANIM;
+    player.kickCd = KICK_CD;
   }
 
   function damageEntity(ent, amount) {
@@ -730,6 +758,8 @@
     player.invuln = Math.max(0, player.invuln - dt);
     player.punchT = Math.max(0, player.punchT - dt);
     player.kickT = Math.max(0, player.kickT - dt);
+    player.punchCd = Math.max(0, player.punchCd - dt);
+    player.kickCd = Math.max(0, player.kickCd - dt);
     player.dmgBoost = Math.max(0, player.dmgBoost - dt);
     player.speedBoost = Math.max(0, player.speedBoost - dt);
 
@@ -752,8 +782,8 @@
     if (ax !== 0) player.facing = ax > 0 ? 1 : -1;
 
     // melee input: punch (Space), kick (K)
-    if (keys.has(' ') && player.punchT <= 0 && player.kickT <= 0) doPunch();
-    if (keys.has('k') && player.punchT <= 0 && player.kickT <= 0) doKick();
+    if (keys.has(' ') && player.punchT <= 0 && player.kickT <= 0 && player.punchCd <= 0) doPunch();
+    if (keys.has('k') && player.punchT <= 0 && player.kickT <= 0 && player.kickCd <= 0) doKick();
 
     if (keys.has('f') && abilities.dash.owned && abilities.dash.t <= 0) {
       abilities.dash.t = abilities.dash.cd;
@@ -803,7 +833,7 @@
     }
 
     // Punch hits enemies
-    const baseDmg = player.dmg + (player.dmgBoost > 0 ? 3 : 0);
+    const baseDmg = player.dmg + (player.dmgBoost > 0 ? 3 : 0) + (player.axeBonus || 0);
     if (player.punchT > 0) {
       const punchRange = 34;
       const px = player.x + player.facing * 22;
