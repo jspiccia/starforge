@@ -126,7 +126,7 @@
 
       <div class="card">
         <h2>Axe</h2>
-        <div class="muted">+5 damage per punch/kick (stacks).</div>
+        <div class="muted">One-time. Goes to your hand; Space = swing axe instead of punch. More damage and range.</div>
         <button id="buyAxe">Buy Axe (40)</button>
       </div>
 
@@ -223,6 +223,7 @@
     dash: { owned: false, cd: 2.0, t: 0 },
     tree: { owned: false, cd: 5.0, t: 0 },
     shield:{ owned: false, cd: 7.0, t: 0, active: 0 },
+    axe: { owned: false }, // one-time: Space becomes axe swing instead of punch
   };
 
   // ---------- Level / Game Flow ----------
@@ -262,7 +263,6 @@
       kickCd: 0,
       dmgBoost: 0,
       speedBoost: 0,
-      axeBonus: prev ? (prev.axeBonus || 0) : 0,
     };
 
     enemies = [];
@@ -322,7 +322,6 @@
       kickCd: 0,
       dmgBoost: 0,
       speedBoost: 0,
-      axeBonus: 0,
     };
 
     enemies = [];
@@ -367,8 +366,8 @@
     bHP.disabled = !shopOpen || !canAfford(30);
     bDmg.disabled = !shopOpen || !canAfford(30);
     if (bAxe) {
-      bAxe.textContent = "Buy Axe (40)";
-      bAxe.disabled = !shopOpen || !canAfford(40);
+      bAxe.textContent = abilities.axe.owned ? "Owned" : "Buy Axe (40)";
+      bAxe.disabled = !shopOpen || abilities.axe.owned || !canAfford(40);
     }
     bSpd.disabled = !shopOpen || !canAfford(30);
   }
@@ -386,7 +385,7 @@
     if (buyHPBtn) buyHPBtn.onclick = () => buy(30, () => { if (player) { player.maxHp += 20; player.hp += 20; } });
     if (buyDmgBtn) buyDmgBtn.onclick = () => buy(30, () => { if (player) player.dmg += 2; });
     const buyAxeBtn = document.getElementById('buyAxe');
-    if (buyAxeBtn) buyAxeBtn.onclick = () => buy(40, () => { if (player) player.axeBonus = (player.axeBonus || 0) + 5; });
+    if (buyAxeBtn) buyAxeBtn.onclick = () => buy(40, () => { abilities.axe.owned = true; });
     if (buySpdBtn) buySpdBtn.onclick = () => buy(30, () => { if (player) player.speed += 0.2; });
   }
 
@@ -541,6 +540,35 @@
     return { x, y };
   }
 
+  function drawAxeAtHand(hx, hy, shoulderX, shoulderY, scale) {
+    const dx = hx - shoulderX, dy = hy - shoulderY;
+    const angle = Math.atan2(dy, dx);
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.rotate(angle);
+    const s = scale;
+    // handle (brown)
+    ctx.strokeStyle = "rgba(139,90,43,0.95)";
+    ctx.lineWidth = 2.5 * s;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(14 * s, 0);
+    ctx.stroke();
+    // blade (silver/gray)
+    ctx.fillStyle = "rgba(192,192,200,0.95)";
+    ctx.strokeStyle = "rgba(140,140,150,0.9)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(14 * s, -5 * s);
+    ctx.lineTo(22 * s, 0);
+    ctx.lineTo(14 * s, 5 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawStick(x, y, facing, scale, isPlayer, hp01, anim) {
     anim = anim || {};
     const punchT = anim.punchT != null ? anim.punchT : 0;
@@ -548,6 +576,7 @@
     const attackT = anim.attackT != null ? anim.attackT : 0;
     const attackType = anim.attackType || null;
     const attackWindup = anim.attackWindup != null ? anim.attackWindup : 0.1;
+    const axeOwned = anim.axeOwned === true;
 
     const shoulderY = y - 3*scale;
     const hipY = y + 12*scale;
@@ -628,8 +657,10 @@
     ctx.stroke();
     ctx.lineCap = "butt";
 
-    // Fist at end of lead arm when punching (hand moving forward — partial 3D feel)
-    if (isPunching) {
+    // Fist at end of lead arm when punching (or axe in hand when player has axe)
+    if (isPlayer && axeOwned) {
+      drawAxeAtHand(leadArmEndX, leadArmEndY, x, shoulderY, scale);
+    } else if (isPunching) {
       const t = punchProgress != null ? punchProgress : punchProgressEnemy;
       if (t != null && t >= 0.08 && t <= 0.6) {
         const fistR = 3.5 * scale;
@@ -781,7 +812,7 @@
 
     if (ax !== 0) player.facing = ax > 0 ? 1 : -1;
 
-    // melee input: punch (Space), kick (K)
+    // melee input: punch or axe swing (Space), kick (K). With axe, Space = swing axe instead of punch.
     if (keys.has(' ') && player.punchT <= 0 && player.kickT <= 0 && player.punchCd <= 0) doPunch();
     if (keys.has('k') && player.punchT <= 0 && player.kickT <= 0 && player.kickCd <= 0) doKick();
 
@@ -832,17 +863,20 @@
       }
     }
 
-    // Punch hits enemies
-    const baseDmg = player.dmg + (player.dmgBoost > 0 ? 3 : 0) + (player.axeBonus || 0);
+    // Punch or axe swing hits enemies (axe = longer range, more damage)
+    const baseDmg = player.dmg + (player.dmgBoost > 0 ? 3 : 0);
+    const hasAxe = abilities.axe.owned;
     if (player.punchT > 0) {
-      const punchRange = 34;
-      const px = player.x + player.facing * 22;
+      const hitRange = hasAxe ? 42 : 34;
+      const px = player.x + player.facing * (hasAxe ? 28 : 22);
       const py = player.y + 5;
+      const dmgMult = hasAxe ? 12.0 : 8.0;
+      const swingDmg = hasAxe ? baseDmg + 10 : baseDmg;
       for (const e of enemies) {
-        if (dist2(px, py, e.x, e.y) < (punchRange * punchRange)) {
-          damageEntity(e, baseDmg * dt * 8.0);
-          e.stun = Math.max(e.stun, 0.08);
-          spawnHitParticles(e.x, e.y, 2);
+        if (dist2(px, py, e.x, e.y) < (hitRange * hitRange)) {
+          damageEntity(e, swingDmg * dt * dmgMult);
+          e.stun = Math.max(e.stun, hasAxe ? 0.14 : 0.08);
+          spawnHitParticles(e.x, e.y, hasAxe ? 6 : 2);
         }
       }
     }
@@ -1009,10 +1043,11 @@
       });
     }
 
-    // player (with shield ring and punch/kick animation)
+    // player (with shield ring, punch/kick or axe swing animation)
     drawStick(player.x, player.y, player.facing, 1, true, player.hp / player.maxHp, {
       punchT: player.punchT,
-      kickT: player.kickT
+      kickT: player.kickT,
+      axeOwned: abilities.axe.owned
     });
 
     if (abilities.shield.active > 0) {
@@ -1029,11 +1064,11 @@
     // punch / kick arc indicator
     if (player.punchT > 0) {
       ctx.save();
-      ctx.globalAlpha = 0.35;
+      ctx.globalAlpha = abilities.axe.owned ? 0.4 : 0.35;
       ctx.beginPath();
-      ctx.arc(player.x + player.facing*18, player.y+4, 18, 0, Math.PI*2);
-      ctx.strokeStyle = "rgba(220,240,255,0.9)";
-      ctx.lineWidth = 2;
+      ctx.arc(player.x + player.facing*18, player.y+4, abilities.axe.owned ? 22 : 18, 0, Math.PI*2);
+      ctx.strokeStyle = abilities.axe.owned ? "rgba(192,160,100,0.9)" : "rgba(220,240,255,0.9)";
+      ctx.lineWidth = abilities.axe.owned ? 2.5 : 2;
       ctx.stroke();
       ctx.restore();
     }
