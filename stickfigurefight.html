@@ -454,8 +454,125 @@
     ent.hp -= amount;
   }
 
-  // ---------- Drawing stick figures ----------
-  function drawStick(x, y, facing, scale, isPlayer, hp01) {
+  // ---------- Drawing stick figures (with punch/kick animation) ----------
+  // Ease for snappy punch/kick
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeInOutQuad(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2; }
+
+  // Get punch arm end offset from shoulder (0,0). t 0=start, 1=end of animation.
+  function punchArmOffset(t, facing, scale) {
+    const s = scale;
+    const f = facing;
+    const rest = { x: 10*f*s, y: 2*s };
+    const windup = { x: 2*f*s, y: -5*s };
+    const strike = { x: 26*f*s, y: 1*s };
+    let x, y;
+    if (t < 0.15) {
+      const u = t / 0.15;
+      const ue = easeOutCubic(u);
+      x = rest.x + (windup.x - rest.x) * ue;
+      y = rest.y + (windup.y - rest.y) * ue;
+    } else if (t < 0.45) {
+      const u = (t - 0.15) / 0.3;
+      const ue = easeOutCubic(u);
+      x = windup.x + (strike.x - windup.x) * ue;
+      y = windup.y + (strike.y - windup.y) * ue;
+    } else {
+      const u = (t - 0.45) / 0.55;
+      const ue = easeInOutQuad(u);
+      x = strike.x + (rest.x - strike.x) * ue;
+      y = strike.y + (rest.y - strike.y) * ue;
+    }
+    return { x, y };
+  }
+
+  // Get kick leg end offset from hip (0,0). t 0=start, 1=end.
+  function kickLegOffset(t, facing, scale) {
+    const s = scale;
+    const f = facing;
+    const rest = { x: 8*f*s, y: 14*s };
+    const windup = { x: 4*f*s, y: 10*s };
+    const kick = { x: 24*f*s, y: 0*s };
+    let x, y;
+    if (t < 0.15) {
+      const u = t / 0.15;
+      const ue = easeOutCubic(u);
+      x = rest.x + (windup.x - rest.x) * ue;
+      y = rest.y + (windup.y - rest.y) * ue;
+    } else if (t < 0.5) {
+      const u = (t - 0.15) / 0.35;
+      const ue = easeOutCubic(u);
+      x = windup.x + (kick.x - windup.x) * ue;
+      y = windup.y + (kick.y - windup.y) * ue;
+    } else {
+      const u = (t - 0.5) / 0.5;
+      const ue = easeInOutQuad(u);
+      x = kick.x + (rest.x - kick.x) * ue;
+      y = kick.y + (rest.y - kick.y) * ue;
+    }
+    return { x, y };
+  }
+
+  function drawStick(x, y, facing, scale, isPlayer, hp01, anim) {
+    anim = anim || {};
+    const punchT = anim.punchT != null ? anim.punchT : 0;
+    const kickT = anim.kickT != null ? anim.kickT : 0;
+    const attackT = anim.attackT != null ? anim.attackT : 0;
+    const attackType = anim.attackType || null;
+    const attackWindup = anim.attackWindup != null ? anim.attackWindup : 0.1;
+
+    const shoulderY = y - 3*scale;
+    const hipY = y + 12*scale;
+
+    // Punch progress: 0 = start, 1 = end (player uses punchT 0.16 total)
+    const punchDuration = 0.16;
+    const punchProgress = punchT > 0 ? 1 - punchT / punchDuration : null;
+    const isPunching = punchProgress != null || (attackType === "punch" && attackT > 0);
+    const punchProgressEnemy = attackType === "punch" && attackWindup > 0
+      ? 1 - attackT / attackWindup
+      : null;
+
+    const kickDuration = 0.22;
+    const kickProgress = kickT > 0 ? 1 - kickT / kickDuration : null;
+    const isKicking = kickProgress != null || (attackType === "kick" && attackT > 0);
+    const kickProgressEnemy = attackType === "kick" && attackWindup > 0
+      ? 1 - attackT / attackWindup
+      : null;
+
+    // Lead arm end (in facing direction) — animate when punching
+    let leadArmEndX = x + 10*scale*facing;
+    let leadArmEndY = shoulderY + 2*scale;
+    if (isPunching) {
+      const t = punchProgress != null ? punchProgress : punchProgressEnemy;
+      if (t != null && t >= 0) {
+        const off = punchArmOffset(Math.min(1, t), facing, scale);
+        leadArmEndX = x + off.x;
+        leadArmEndY = shoulderY + off.y;
+      }
+    }
+
+    // Rear arm (opposite side) — slight pull-back when punching for balance
+    let rearArmEndX = x - 9*scale*facing;
+    let rearArmEndY = shoulderY + 3*scale;
+    if (isPunching && punchProgress != null) {
+      const t = punchProgress;
+      const pull = t < 0.5 ? t * 0.5 : (1 - t) * 0.5;
+      rearArmEndX = x + (-9 - 3*pull) * scale * facing;
+      rearArmEndY = shoulderY + (3 - 1.5*pull) * scale;
+    }
+
+    // Lead leg end — animate when kicking
+    let leadLegEndX = x + 8*scale*facing;
+    let leadLegEndY = hipY + 14*scale;
+    if (isKicking) {
+      const t = kickProgress != null ? kickProgress : kickProgressEnemy;
+      if (t != null && t >= 0) {
+        const off = kickLegOffset(Math.min(1, t), facing, scale);
+        leadLegEndX = x + off.x;
+        leadLegEndY = hipY + off.y;
+      }
+    }
+
     // head
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -463,23 +580,61 @@
     ctx.strokeStyle = isPlayer ? "rgba(180,220,255,0.95)" : "rgba(255,180,180,0.9)";
     ctx.stroke();
 
-    // body + limbs
+    // body + limbs (animated)
     ctx.strokeStyle = isPlayer ? "rgba(220,240,255,0.9)" : "rgba(255,210,210,0.85)";
+    ctx.lineCap = "round";
     ctx.beginPath();
     // torso
     ctx.moveTo(x, y - 11*scale);
-    ctx.lineTo(x, y + 12*scale);
+    ctx.lineTo(x, hipY);
     // arms
-    ctx.moveTo(x, y - 3*scale);
-    ctx.lineTo(x + 10*scale*facing, y + 2*scale);
-    ctx.moveTo(x, y - 3*scale);
-    ctx.lineTo(x - 9*scale*facing, y + 3*scale);
+    ctx.moveTo(x, shoulderY);
+    ctx.lineTo(leadArmEndX, leadArmEndY);
+    ctx.moveTo(x, shoulderY);
+    ctx.lineTo(rearArmEndX, rearArmEndY);
     // legs
-    ctx.moveTo(x, y + 12*scale);
-    ctx.lineTo(x + 8*scale*facing, y + 26*scale);
-    ctx.moveTo(x, y + 12*scale);
-    ctx.lineTo(x - 8*scale*facing, y + 26*scale);
+    ctx.moveTo(x, hipY);
+    ctx.lineTo(leadLegEndX, leadLegEndY);
+    ctx.moveTo(x, hipY);
+    ctx.lineTo(x - 8*scale*facing, hipY + 14*scale);
     ctx.stroke();
+    ctx.lineCap = "butt";
+
+    // Fist at end of lead arm when punching (hand moving forward — partial 3D feel)
+    if (isPunching) {
+      const t = punchProgress != null ? punchProgress : punchProgressEnemy;
+      if (t != null && t >= 0.08 && t <= 0.6) {
+        const fistR = 3.5 * scale;
+        ctx.beginPath();
+        ctx.arc(leadArmEndX, leadArmEndY, fistR, 0, Math.PI * 2);
+        ctx.fillStyle = isPlayer ? "rgba(200,225,255,0.95)" : "rgba(255,200,200,0.9)";
+        ctx.fill();
+        ctx.strokeStyle = isPlayer ? "rgba(180,220,255,0.9)" : "rgba(255,180,180,0.85)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.lineWidth = 2;
+      }
+    }
+    // Foot at end of lead leg when kicking
+    if (isKicking) {
+      const t = kickProgress != null ? kickProgress : kickProgressEnemy;
+      if (t != null && t >= 0.1 && t <= 0.55) {
+        const footW = 5 * scale;
+        const footH = 3 * scale;
+        ctx.save();
+        ctx.translate(leadLegEndX, leadLegEndY);
+        ctx.rotate(facing * (0.3 - t * 0.4));
+        ctx.beginPath();
+        ctx.ellipse(0, 0, footW, footH, 0, 0, Math.PI * 2);
+        ctx.fillStyle = isPlayer ? "rgba(200,225,255,0.9)" : "rgba(255,200,200,0.85)";
+        ctx.fill();
+        ctx.strokeStyle = isPlayer ? "rgba(180,220,255,0.85)" : "rgba(255,180,180,0.8)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+        ctx.lineWidth = 2;
+      }
+    }
 
     // tiny HP bar
     const w = 28*scale, h = 4*scale;
@@ -813,14 +968,22 @@
     // powerups
     for (const p of powerups) drawPowerup(p);
 
-    // enemies
+    // enemies (with punch/kick animation)
     for (const e of enemies) {
       const facing = (player.x - e.x) >= 0 ? 1 : -1;
-      drawStick(e.x, e.y, facing, 1, false, e.hp / e.maxHp);
+      const windup = 0.08 + (e.combo && e.combo.length > 1 ? 0.02 : 0);
+      drawStick(e.x, e.y, facing, 1, false, e.hp / e.maxHp, {
+        attackT: e.attackT,
+        attackType: e.attackType,
+        attackWindup: windup
+      });
     }
 
-    // player (with shield ring)
-    drawStick(player.x, player.y, player.facing, 1, true, player.hp / player.maxHp);
+    // player (with shield ring and punch/kick animation)
+    drawStick(player.x, player.y, player.facing, 1, true, player.hp / player.maxHp, {
+      punchT: player.punchT,
+      kickT: player.kickT
+    });
 
     if (abilities.shield.active > 0) {
       ctx.save();
