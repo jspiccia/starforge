@@ -277,6 +277,7 @@
     if (!canAfford(cost)) { ping("Not enough points."); return; }
     state.points -= cost;
     onBuy();
+    elPoints.textContent = String(state.points);
     ping("Purchased!");
     syncShopButtons();
   }
@@ -289,6 +290,7 @@
     const bHP = document.getElementById('buyHP');
     const bDmg = document.getElementById('buyDmg');
     const bSpd = document.getElementById('buySpd');
+    if (!bDash) return;
 
     bDash.textContent = abilities.dash.owned ? "Owned" : "Buy Dash (25)";
     bTree.textContent = abilities.tree.owned ? "Owned" : "Buy Tree (35)";
@@ -305,13 +307,22 @@
     bSpd.disabled = !canAfford(30);
   }
 
-  document.getElementById('buyDash').onclick = () => buy(25, () => abilities.dash.owned = true);
-  document.getElementById('buyTree').onclick = () => buy(35, () => abilities.tree.owned = true);
-  document.getElementById('buyBlast').onclick = () => buy(40, () => abilities.blast.owned = true);
-  document.getElementById('buyShield').onclick = () => buy(45, () => abilities.shield.owned = true);
-  document.getElementById('buyHP').onclick = () => buy(30, () => { player.maxHp += 20; player.hp += 20; });
-  document.getElementById('buyDmg').onclick = () => buy(30, () => { player.dmg += 2; });
-  document.getElementById('buySpd').onclick = () => buy(30, () => { player.speed += 0.2; });
+  function setupShop() {
+    const buyDashBtn = document.getElementById('buyDash');
+    const buyTreeBtn = document.getElementById('buyTree');
+    const buyBlastBtn = document.getElementById('buyBlast');
+    const buyShieldBtn = document.getElementById('buyShield');
+    const buyHPBtn = document.getElementById('buyHP');
+    const buyDmgBtn = document.getElementById('buyDmg');
+    const buySpdBtn = document.getElementById('buySpd');
+    if (buyDashBtn) buyDashBtn.onclick = () => buy(25, () => { abilities.dash.owned = true; });
+    if (buyTreeBtn) buyTreeBtn.onclick = () => buy(35, () => { abilities.tree.owned = true; });
+    if (buyBlastBtn) buyBlastBtn.onclick = () => buy(40, () => { abilities.blast.owned = true; });
+    if (buyShieldBtn) buyShieldBtn.onclick = () => buy(45, () => { abilities.shield.owned = true; });
+    if (buyHPBtn) buyHPBtn.onclick = () => buy(30, () => { if (player) { player.maxHp += 20; player.hp += 20; } });
+    if (buyDmgBtn) buyDmgBtn.onclick = () => buy(30, () => { if (player) player.dmg += 2; });
+    if (buySpdBtn) buySpdBtn.onclick = () => buy(30, () => { if (player) player.speed += 0.2; });
+  }
 
   // ---------- Messaging ----------
   function ping(msg) {
@@ -320,9 +331,9 @@
   }
 
   // ---------- Spawning ----------
+  // NPCs scale with wave AND progress into the level (xp within current wave) so they get stronger the deeper you go
   function spawnEnemy() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    // spawn around edges
     const side = Math.floor(Math.random()*4);
     let x, y;
     if (side === 0) { x = -30; y = Math.random()*h; }
@@ -330,18 +341,27 @@
     if (side === 2) { x = Math.random()*w; y = -30; }
     if (side === 3) { x = Math.random()*w; y = h+30; }
 
-    const base = 26 + state.wave*3;
+    const wave = state.wave;
+    // progress within current wave (0 to 1) - later spawns in a wave are tougher
+    const progressInWave = Math.min(1, state.xpNeed > 0 ? state.xp / state.xpNeed : 0);
+    const progressMult = 1 + 0.25 * progressInWave; // up to 25% stronger at end of wave
+
+    const hpBase = Math.floor((22 + wave * 5 + Math.floor(wave * 0.5)) * progressMult);
+    const speedBase = (1.1 + Math.min(2.2, wave * 0.14)) * (1 + 0.12 * progressInWave);
+    const dmgBase = (6 + Math.min(16, wave * 0.9)) * progressMult;
+    const rangedChance = Math.min(0.55, 0.12 + wave * 0.035 + progressInWave * 0.1);
+
     enemies.push({
       x, y,
       vx: 0, vy: 0,
       r: 16,
-      hp: base,
-      maxHp: base,
-      speed: 1.2 + Math.min(1.4, state.wave*0.08),
-      dmg: 8 + Math.min(6, state.wave*0.4),
+      hp: hpBase,
+      maxHp: hpBase,
+      speed: speedBase,
+      dmg: dmgBase,
       atkCd: 0,
       stun: 0,
-      type: (Math.random() < 0.18) ? "ranged" : "melee",
+      type: (Math.random() < rangedChance) ? "ranged" : "melee",
       shootCd: 0,
     });
   }
@@ -665,10 +685,11 @@
           }
         }
       } else {
-        // ranged enemy
+        // ranged enemy (damage scales with wave)
         if (d < 520 && e.shootCd <= 0) {
-          e.shootCd = 0.9 + Math.random()*0.4;
-          shoot(e, player.x, player.y-10, 380, 10 + state.wave*0.7, "normal");
+          e.shootCd = Math.max(0.5, 1.0 - state.wave*0.03) + Math.random()*0.3;
+          const bulletDmg = 8 + Math.min(14, state.wave * 0.8);
+          shoot(e, player.x, player.y-10, 380, bulletDmg, "normal");
         }
         // keep a little distance
         if (d < 150) { e.x -= (dx/d)*1.5; e.y -= (dy/d)*1.5; }
@@ -927,6 +948,7 @@
   // ---------- Boot ----------
   resize();
   resetGame();
+  setupShop();
   requestAnimationFrame(loop);
 })();
 </script>
