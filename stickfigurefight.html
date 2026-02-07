@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stick Fighter: Powers & Shop (Single-File)</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0b0f17; color:#e8eefc; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #wrap { display:grid; grid-template-columns: 1fr 320px; height:100%; }
+    canvas { width:100%; height:100%; display:block; background: radial-gradient(circle at 50% 20%, #17233a 0%, #0b0f17 65%); }
+    #ui {
+      border-left: 1px solid rgba(255,255,255,0.08);
+      padding: 14px 14px 10px;
+      overflow:auto;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
+    }
+    h1 { font-size: 16px; margin: 0 0 10px; letter-spacing: .3px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin: 8px 0; }
+    .pill { font-size: 12px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.10); }
+    .bar { height: 10px; border-radius: 999px; background: rgba(255,255,255,0.10); overflow:hidden; border: 1px solid rgba(255,255,255,0.10); }
+    .bar > div { height:100%; width:50%; background: rgba(120,200,255,0.9); }
+    .bar.red > div { background: rgba(255,110,110,0.95); }
+    .muted { color: rgba(232,238,252,0.75); font-size: 12px; line-height: 1.35; }
+    .shop { margin-top: 12px; }
+    .card {
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      border-radius: 14px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    .card h2 { font-size: 13px; margin:0 0 6px; }
+    button {
+      cursor:pointer;
+      width:100%;
+      margin-top: 8px;
+      padding: 10px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.07);
+      color:#e8eefc;
+      font-weight: 650;
+    }
+    button:disabled { opacity: 0.45; cursor:not-allowed; }
+    kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+          font-size: 11px; padding: 2px 6px; border-radius: 6px;
+          border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); }
+    .tiny { font-size: 11px; color: rgba(232,238,252,0.72); }
+    .sep { height:1px; background: rgba(255,255,255,0.08); margin: 10px 0; }
+    .hint { font-size: 12px; }
+    .good { color: #a6ffcb; }
+    .warn { color: #ffd48a; }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <h1>Stick Fighter</h1>
+
+    <div class="row">
+      <span class="pill">Move: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
+      <span class="pill">Punch: <kbd>Space</kbd></span>
+      <span class="pill">Shoot: <kbd>Mouse</kbd></span>
+    </div>
+
+    <div class="row">
+      <span class="pill">Dash: <kbd>F</kbd></span>
+      <span class="pill">Tree: <kbd>R</kbd></span>
+      <span class="pill">Blast: <kbd>Q</kbd></span>
+      <span class="pill">Shield: <kbd>E</kbd></span>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="row">
+      <div style="flex:1">
+        <div class="tiny">Player HP</div>
+        <div class="bar red"><div id="hpBar"></div></div>
+      </div>
+      <div style="flex:1">
+        <div class="tiny">XP / Points</div>
+        <div class="bar"><div id="xpBar"></div></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="pill">Points: <b id="points">0</b></span>
+      <span class="pill">Wave: <b id="wave">1</b></span>
+      <span class="pill">Kills: <b id="kills">0</b></span>
+    </div>
+
+    <div class="muted">
+      Defeat NPCs to earn points. Buy abilities below. Powerups randomly spawn: <span class="good">Heal</span>, <span class="warn">Damage+</span>, <span class="good">Speed+</span>.
+    </div>
+
+    <div class="shop">
+      <div class="card">
+        <h2>Dash (<kbd>F</kbd>)</h2>
+        <div class="muted">Quick burst movement. Cooldown 2.0s.</div>
+        <button id="buyDash">Buy Dash (25)</button>
+      </div>
+
+      <div class="card">
+        <h2>Summon Tree (<kbd>R</kbd>)</h2>
+        <div class="muted">Spawns a blocking tree for 6s. Cooldown 5.0s.</div>
+        <button id="buyTree">Buy Tree (35)</button>
+      </div>
+
+      <div class="card">
+        <h2>Energy Blast (<kbd>Q</kbd>)</h2>
+        <div class="muted">Strong ranged shot. Cooldown 2.5s.</div>
+        <button id="buyBlast">Buy Blast (40)</button>
+      </div>
+
+      <div class="card">
+        <h2>Shield (<kbd>E</kbd>)</h2>
+        <div class="muted">Reduces damage for 3s. Cooldown 7.0s.</div>
+        <button id="buyShield">Buy Shield (45)</button>
+      </div>
+
+      <div class="card">
+        <h2>Upgrade: Max HP</h2>
+        <div class="muted">Increase max HP by +20 (stacks).</div>
+        <button id="buyHP">Buy +20 HP (30)</button>
+      </div>
+
+      <div class="card">
+        <h2>Upgrade: Damage</h2>
+        <div class="muted">Increase melee + projectile damage (stacks).</div>
+        <button id="buyDmg">Buy +2 Damage (30)</button>
+      </div>
+
+      <div class="card">
+        <h2>Upgrade: Move Speed</h2>
+        <div class="muted">Run faster (stacks).</div>
+        <button id="buySpd">Buy +0.2 Speed (30)</button>
+      </div>
+
+      <div class="sep"></div>
+      <div class="muted hint">
+        Tip: If you die, press <kbd>Enter</kbd> to restart.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- Canvas / Scaling ----------
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(canvas.clientWidth * dpr);
+    canvas.height = Math.floor(canvas.clientHeight * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------- UI ----------
+  const elPoints = document.getElementById('points');
+  const elWave = document.getElementById('wave');
+  const elKills = document.getElementById('kills');
+  const hpBar = document.getElementById('hpBar');
+  const xpBar = document.getElementById('xpBar');
+
+  // ---------- Input ----------
+  const keys = new Set();
+  window.addEventListener('keydown', (e) => {
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+    keys.add(e.key.toLowerCase());
+    if (e.key === 'Enter' && state.gameOver) resetGame();
+  });
+  window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+
+  const mouse = { x: 0, y: 0, down: false };
+  canvas.addEventListener('mousemove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - r.left);
+    mouse.y = (e.clientY - r.top);
+  });
+  canvas.addEventListener('mousedown', () => mouse.down = true);
+  window.addEventListener('mouseup', () => mouse.down = false);
+
+  // ---------- Helpers ----------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist2 = (ax, ay, bx, by) => {
+    const dx = ax - bx, dy = ay - by;
+    return dx*dx + dy*dy;
+  };
+
+  // Simple rectangle collision
+  function rectsOverlap(a,b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // ---------- Game State ----------
+  const state = {
+    points: 0,
+    kills: 0,
+    wave: 1,
+    gameOver: false,
+    lastTime: 0,
+    spawnTimer: 0,
+    powerTimer: 0,
+    messageTimer: 0,
+    message: "",
+    // progression-ish: fill bar as you get points
+    xp: 0,
+    xpNeed: 50,
+  };
+
+  // Entities
+  let player, enemies, bullets, obstacles, powerups, particles;
+
+  // Shop / Abilities (locked until bought)
+  const abilities = {
+    dash: { owned: false, cd: 2.0, t: 0 },
+    tree: { owned: false, cd: 5.0, t: 0 },
+    blast:{ owned: false, cd: 2.5, t: 0 },
+    shield:{ owned: false, cd: 7.0, t: 0, active: 0 },
+  };
+
+  // ---------- Init / Reset ----------
+  function resetGame() {
+    state.points = 0;
+    state.kills = 0;
+    state.wave = 1;
+    state.gameOver = false;
+    state.spawnTimer = 0;
+    state.powerTimer = 0;
+    state.messageTimer = 0;
+    state.message = "";
+    state.xp = 0;
+    state.xpNeed = 50;
+
+    // reset abilities but keep purchases? For now: keep purchases across restarts? You probably want reset all:
+    abilities.dash.owned = false;
+    abilities.tree.owned = false;
+    abilities.blast.owned = false;
+    abilities.shield.owned = false;
+    abilities.shield.active = 0;
+    for (const k in abilities) abilities[k].t = 0;
+
+    player = {
+      x: 200, y: 240,
+      vx: 0, vy: 0,
+      r: 16,
+      hp: 100,
+      maxHp: 100,
+      speed: 2.2,
+      dmg: 6,
+      facing: 1,
+      invuln: 0,
+      punchT: 0,
+      shootCd: 0,
+      dmgBoost: 0,
+      speedBoost: 0,
+    };
+
+    enemies = [];
+    bullets = [];
+    obstacles = [];
+    powerups = [];
+    particles = [];
+
+    syncShopButtons();
+  }
+
+  // ---------- Shop ----------
+  function canAfford(cost) { return state.points >= cost; }
+
+  function buy(cost, onBuy) {
+    if (state.gameOver) return;
+    if (!canAfford(cost)) { ping("Not enough points."); return; }
+    state.points -= cost;
+    onBuy();
+    ping("Purchased!");
+    syncShopButtons();
+  }
+
+  function syncShopButtons() {
+    const bDash = document.getElementById('buyDash');
+    const bTree = document.getElementById('buyTree');
+    const bBlast = document.getElementById('buyBlast');
+    const bShield = document.getElementById('buyShield');
+    const bHP = document.getElementById('buyHP');
+    const bDmg = document.getElementById('buyDmg');
+    const bSpd = document.getElementById('buySpd');
+
+    bDash.textContent = abilities.dash.owned ? "Owned" : "Buy Dash (25)";
+    bTree.textContent = abilities.tree.owned ? "Owned" : "Buy Tree (35)";
+    bBlast.textContent = abilities.blast.owned ? "Owned" : "Buy Blast (40)";
+    bShield.textContent = abilities.shield.owned ? "Owned" : "Buy Shield (45)";
+
+    bDash.disabled = abilities.dash.owned || !canAfford(25);
+    bTree.disabled = abilities.tree.owned || !canAfford(35);
+    bBlast.disabled = abilities.blast.owned || !canAfford(40);
+    bShield.disabled = abilities.shield.owned || !canAfford(45);
+
+    bHP.disabled = !canAfford(30);
+    bDmg.disabled = !canAfford(30);
+    bSpd.disabled = !canAfford(30);
+  }
+
+  document.getElementById('buyDash').onclick = () => buy(25, () => abilities.dash.owned = true);
+  document.getElementById('buyTree').onclick = () => buy(35, () => abilities.tree.owned = true);
+  document.getElementById('buyBlast').onclick = () => buy(40, () => abilities.blast.owned = true);
+  document.getElementById('buyShield').onclick = () => buy(45, () => abilities.shield.owned = true);
+  document.getElementById('buyHP').onclick = () => buy(30, () => { player.maxHp += 20; player.hp += 20; });
+  document.getElementById('buyDmg').onclick = () => buy(30, () => { player.dmg += 2; });
+  document.getElementById('buySpd').onclick = () => buy(30, () => { player.speed += 0.2; });
+
+  // ---------- Messaging ----------
+  function ping(msg) {
+    state.message = msg;
+    state.messageTimer = 1.2;
+  }
+
+  // ---------- Spawning ----------
+  function spawnEnemy() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    // spawn around edges
+    const side = Math.floor(Math.random()*4);
+    let x, y;
+    if (side === 0) { x = -30; y = Math.random()*h; }
+    if (side === 1) { x = w+30; y = Math.random()*h; }
+    if (side === 2) { x = Math.random()*w; y = -30; }
+    if (side === 3) { x = Math.random()*w; y = h+30; }
+
+    const base = 26 + state.wave*3;
+    enemies.push({
+      x, y,
+      vx: 0, vy: 0,
+      r: 16,
+      hp: base,
+      maxHp: base,
+      speed: 1.2 + Math.min(1.4, state.wave*0.08),
+      dmg: 8 + Math.min(6, state.wave*0.4),
+      atkCd: 0,
+      stun: 0,
+      type: (Math.random() < 0.18) ? "ranged" : "melee",
+      shootCd: 0,
+    });
+  }
+
+  function spawnPowerup() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const kinds = ["heal", "dmg", "spd"];
+    const kind = kinds[Math.floor(Math.random()*kinds.length)];
+    powerups.push({
+      x: 40 + Math.random()*(w-80),
+      y: 40 + Math.random()*(h-80),
+      r: 12,
+      kind,
+      t: 10, // seconds until despawn
+    });
+  }
+
+  function spawnTree(px, py) {
+    obstacles.push({
+      kind: "tree",
+      x: px - 18, y: py - 26,
+      w: 36, h: 52,
+      t: 6.0
+    });
+  }
+
+  // ---------- Combat ----------
+  function shoot(from, tx, ty, speed, dmg, colorHint) {
+    const dx = tx - from.x, dy = ty - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx/len, uy = dy/len;
+    bullets.push({
+      x: from.x, y: from.y,
+      vx: ux*speed, vy: uy*speed,
+      r: 4,
+      dmg,
+      ttl: 2.0,
+      owner: from === player ? "player" : "enemy",
+      hint: colorHint || "normal",
+    });
+  }
+
+  function doPunch() {
+    player.punchT = 0.16;
+  }
+
+  function damageEntity(ent, amount) {
+    ent.hp -= amount;
+  }
+
+  // ---------- Drawing stick figures ----------
+  function drawStick(x, y, facing, scale, isPlayer, hp01) {
+    // head
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y - 18*scale, 7*scale, 0, Math.PI*2);
+    ctx.strokeStyle = isPlayer ? "rgba(180,220,255,0.95)" : "rgba(255,180,180,0.9)";
+    ctx.stroke();
+
+    // body + limbs
+    ctx.strokeStyle = isPlayer ? "rgba(220,240,255,0.9)" : "rgba(255,210,210,0.85)";
+    ctx.beginPath();
+    // torso
+    ctx.moveTo(x, y - 11*scale);
+    ctx.lineTo(x, y + 12*scale);
+    // arms
+    ctx.moveTo(x, y - 3*scale);
+    ctx.lineTo(x + 10*scale*facing, y + 2*scale);
+    ctx.moveTo(x, y - 3*scale);
+    ctx.lineTo(x - 9*scale*facing, y + 3*scale);
+    // legs
+    ctx.moveTo(x, y + 12*scale);
+    ctx.lineTo(x + 8*scale*facing, y + 26*scale);
+    ctx.moveTo(x, y + 12*scale);
+    ctx.lineTo(x - 8*scale*facing, y + 26*scale);
+    ctx.stroke();
+
+    // tiny HP bar
+    const w = 28*scale, h = 4*scale;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(x - w/2, y - 36*scale, w, h);
+    ctx.fillStyle = isPlayer ? "rgba(120,200,255,0.9)" : "rgba(255,110,110,0.9)";
+    ctx.fillRect(x - w/2, y - 36*scale, w*clamp(hp01,0,1), h);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTreeObstacle(o) {
+    // trunk + canopy
+    ctx.save();
+    ctx.translate(o.x + o.w/2, o.y + o.h/2);
+    ctx.globalAlpha = clamp(o.t/6, 0.25, 1);
+    // trunk
+    ctx.fillStyle = "rgba(180,140,90,0.85)";
+    ctx.fillRect(-6, -6, 12, 26);
+    // canopy
+    ctx.beginPath();
+    ctx.arc(0, -16, 18, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(140,220,160,0.8)";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPowerup(p) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(0, 0, p.r, 0, Math.PI*2);
+    let col = "rgba(180,220,255,0.85)";
+    if (p.kind === "heal") col = "rgba(160,255,200,0.85)";
+    if (p.kind === "dmg") col = "rgba(255,210,140,0.9)";
+    if (p.kind === "spd") col = "rgba(200,180,255,0.85)";
+    ctx.fillStyle = col;
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.font = "12px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(p.kind === "heal" ? "+" : (p.kind === "dmg" ? "D" : "S"), 0, 1);
+    ctx.restore();
+  }
+
+  function drawBullet(b) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(0, 0, b.r, 0, Math.PI*2);
+    let col = "rgba(220,240,255,0.9)";
+    if (b.owner === "enemy") col = "rgba(255,190,190,0.9)";
+    if (b.hint === "blast") col = "rgba(255,235,170,0.95)";
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function spawnHitParticles(x,y, n=10) {
+    for (let i=0;i<n;i++) {
+      particles.push({
+        x, y,
+        vx: (Math.random()*2-1)*90,
+        vy: (Math.random()*2-1)*90,
+        r: 2 + Math.random()*2,
+        t: 0.4 + Math.random()*0.4
+      });
+    }
+  }
+
+  function drawParticles(dt) {
+    for (let i=particles.length-1;i>=0;i--) {
+      const p = particles[i];
+      p.t -= dt;
+      if (p.t <= 0) { particles.splice(i,1); continue; }
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      p.vx *= 0.92; p.vy *= 0.92;
+      ctx.globalAlpha = clamp(p.t, 0, 1);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ---------- Game Logic ----------
+  function update(dt) {
+    if (state.gameOver) return;
+
+    // cooldown timers
+    player.invuln = Math.max(0, player.invuln - dt);
+    player.punchT = Math.max(0, player.punchT - dt);
+    player.shootCd = Math.max(0, player.shootCd - dt);
+    player.dmgBoost = Math.max(0, player.dmgBoost - dt);
+    player.speedBoost = Math.max(0, player.speedBoost - dt);
+
+    for (const k in abilities) abilities[k].t = Math.max(0, abilities[k].t - dt);
+    abilities.shield.active = Math.max(0, abilities.shield.active - dt);
+
+    // movement
+    let ax = 0, ay = 0;
+    if (keys.has('a')) ax -= 1;
+    if (keys.has('d')) ax += 1;
+    if (keys.has('w')) ay -= 1;
+    if (keys.has('s')) ay += 1;
+    const len = Math.hypot(ax, ay) || 1;
+    ax /= len; ay /= len;
+
+    const speed = player.speed * (player.speedBoost > 0 ? 1.35 : 1);
+    player.vx = ax * speed;
+    player.vy = ay * speed;
+
+    if (ax !== 0) player.facing = ax > 0 ? 1 : -1;
+
+    // abilities input
+    if (keys.has(' ')) { // punch
+      // only trigger when not already punching
+      if (player.punchT <= 0) doPunch();
+    }
+
+    if (keys.has('f') && abilities.dash.owned && abilities.dash.t <= 0) {
+      abilities.dash.t = abilities.dash.cd;
+      const dashMag = 12;
+      const dx = (ax !== 0 || ay !== 0) ? ax : player.facing;
+      const dy = (ax !== 0 || ay !== 0) ? ay : 0;
+      player.x += dx * dashMag * 6;
+      player.y += dy * dashMag * 6;
+      player.invuln = Math.max(player.invuln, 0.15);
+      spawnHitParticles(player.x, player.y, 12);
+    }
+
+    if (keys.has('r') && abilities.tree.owned && abilities.tree.t <= 0) {
+      abilities.tree.t = abilities.tree.cd;
+      spawnTree(player.x + player.facing*26, player.y + 10);
+      ping("Tree!");
+    }
+
+    if (keys.has('q') && abilities.blast.owned && abilities.blast.t <= 0) {
+      abilities.blast.t = abilities.blast.cd;
+      shoot(player, mouse.x, mouse.y, 520, player.dmg + 8 + (player.dmgBoost>0?3:0), "blast");
+    }
+
+    if (keys.has('e') && abilities.shield.owned && abilities.shield.t <= 0) {
+      abilities.shield.t = abilities.shield.cd;
+      abilities.shield.active = 3.0;
+      ping("Shield up!");
+    }
+
+    // basic shooting with mouse
+    if (mouse.down && player.shootCd <= 0) {
+      player.shootCd = 0.18;
+      shoot(player, mouse.x, mouse.y, 620, player.dmg + (player.dmgBoost>0?2:0), "normal");
+    }
+
+    // apply movement, bounds
+    player.x += player.vx;
+    player.y += player.vy;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    player.x = clamp(player.x, 20, w-20);
+    player.y = clamp(player.y, 50, h-20);
+
+    // obstacles timer + collision (simple push out)
+    for (let i=obstacles.length-1;i>=0;i--) {
+      const o = obstacles[i];
+      o.t -= dt;
+      if (o.t <= 0) { obstacles.splice(i,1); continue; }
+
+      // player collision
+      const pb = { x: player.x-player.r, y: player.y-player.r, w: player.r*2, h: player.r*2 };
+      if (rectsOverlap(pb, o)) {
+        // push player out (very simple)
+        if (player.x < o.x) player.x = o.x - player.r - 1;
+        else if (player.x > o.x + o.w) player.x = o.x + o.w + player.r + 1;
+        if (player.y < o.y) player.y = o.y - player.r - 1;
+        else if (player.y > o.y + o.h) player.y = o.y + o.h + player.r + 1;
+      }
+    }
+
+    // Punch hits enemies
+    if (player.punchT > 0) {
+      const punchRange = 34;
+      const px = player.x + player.facing * 22;
+      const py = player.y + 5;
+      for (const e of enemies) {
+        if (dist2(px, py, e.x, e.y) < (punchRange*punchRange)) {
+          const dmg = player.dmg + (player.dmgBoost>0?3:0);
+          damageEntity(e, dmg * dt * 8.0); // scale by dt for continuous window
+          e.stun = Math.max(e.stun, 0.08);
+          spawnHitParticles(e.x, e.y, 2);
+        }
+      }
+    }
+
+    // Enemy AI + attacks
+    for (const e of enemies) {
+      e.stun = Math.max(0, e.stun - dt);
+      e.atkCd = Math.max(0, e.atkCd - dt);
+      e.shootCd = Math.max(0, e.shootCd - dt);
+
+      const dx = player.x - e.x, dy = player.y - e.y;
+      const d = Math.hypot(dx, dy) || 1;
+
+      if (e.stun <= 0) {
+        // avoid trees a bit: simple steering away if inside obstacle
+        let steerX = dx/d, steerY = dy/d;
+
+        for (const o of obstacles) {
+          const eb = { x: e.x-e.r, y: e.y-e.r, w: e.r*2, h: e.r*2 };
+          if (rectsOverlap(eb, o)) {
+            // steer away from obstacle center
+            const cx = o.x + o.w/2, cy = o.y + o.h/2;
+            const odx = e.x - cx, ody = e.y - cy;
+            const ol = Math.hypot(odx, ody) || 1;
+            steerX += (odx/ol)*1.4;
+            steerY += (ody/ol)*1.4;
+          }
+        }
+        const sl = Math.hypot(steerX, steerY) || 1;
+        steerX /= sl; steerY /= sl;
+
+        e.vx = steerX * e.speed;
+        e.vy = steerY * e.speed;
+      } else {
+        e.vx *= 0.7; e.vy *= 0.7;
+      }
+
+      e.x += e.vx;
+      e.y += e.vy;
+
+      // melee hit
+      if (e.type === "melee") {
+        if (d < 34 && e.atkCd <= 0) {
+          e.atkCd = 0.55;
+          let dmg = e.dmg;
+          if (abilities.shield.active > 0) dmg *= 0.55;
+          if (player.invuln <= 0) {
+            player.hp -= dmg;
+            player.invuln = 0.10;
+            spawnHitParticles(player.x, player.y, 10);
+          }
+        }
+      } else {
+        // ranged enemy
+        if (d < 520 && e.shootCd <= 0) {
+          e.shootCd = 0.9 + Math.random()*0.4;
+          shoot(e, player.x, player.y-10, 380, 10 + state.wave*0.7, "normal");
+        }
+        // keep a little distance
+        if (d < 150) { e.x -= (dx/d)*1.5; e.y -= (dy/d)*1.5; }
+      }
+
+      // bounds
+      e.x = clamp(e.x, -40, w+40);
+      e.y = clamp(e.y, -40, h+40);
+    }
+
+    // bullets update + collisions
+    for (let i=bullets.length-1;i>=0;i--) {
+      const b = bullets[i];
+      b.ttl -= dt;
+      if (b.ttl <= 0) { bullets.splice(i,1); continue; }
+
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      // hit obstacles (trees)
+      let hitObstacle = false;
+      for (const o of obstacles) {
+        const bb = { x: b.x-b.r, y: b.y-b.r, w: b.r*2, h: b.r*2 };
+        if (rectsOverlap(bb, o)) { hitObstacle = true; break; }
+      }
+      if (hitObstacle) {
+        spawnHitParticles(b.x, b.y, 8);
+        bullets.splice(i,1);
+        continue;
+      }
+
+      // hit enemies / player
+      if (b.owner === "player") {
+        for (const e of enemies) {
+          if (dist2(b.x, b.y, e.x, e.y) < (e.r*e.r)) {
+            damageEntity(e, b.dmg);
+            spawnHitParticles(e.x, e.y, 10);
+            bullets.splice(i,1);
+            break;
+          }
+        }
+      } else {
+        if (dist2(b.x, b.y, player.x, player.y) < (player.r*player.r)) {
+          if (player.invuln <= 0) {
+            let dmg = b.dmg;
+            if (abilities.shield.active > 0) dmg *= 0.55;
+            player.hp -= dmg;
+            player.invuln = 0.10;
+            spawnHitParticles(player.x, player.y, 12);
+          }
+          bullets.splice(i,1);
+        }
+      }
+
+      // out of bounds
+      if (b.x < -80 || b.x > w+80 || b.y < -80 || b.y > h+80) {
+        bullets.splice(i,1);
+      }
+    }
+
+    // powerups update + pickup
+    for (let i=powerups.length-1;i>=0;i--) {
+      const p = powerups[i];
+      p.t -= dt;
+      if (p.t <= 0) { powerups.splice(i,1); continue; }
+      if (dist2(p.x, p.y, player.x, player.y) < (26*26)) {
+        if (p.kind === "heal") {
+          player.hp = Math.min(player.maxHp, player.hp + 30);
+          ping("Healed!");
+        } else if (p.kind === "dmg") {
+          player.dmgBoost = 8.0;
+          ping("Damage Up!");
+        } else if (p.kind === "spd") {
+          player.speedBoost = 8.0;
+          ping("Speed Up!");
+        }
+        powerups.splice(i,1);
+      }
+    }
+
+    // enemies death -> points
+    for (let i=enemies.length-1;i>=0;i--) {
+      const e = enemies[i];
+      if (e.hp <= 0) {
+        enemies.splice(i,1);
+        state.kills += 1;
+        const gain = 8 + Math.floor(state.wave*1.5);
+        state.points += gain;
+        state.xp += gain;
+        spawnHitParticles(e.x, e.y, 22);
+      }
+    }
+
+    // wave progression
+    while (state.xp >= state.xpNeed) {
+      state.xp -= state.xpNeed;
+      state.wave += 1;
+      state.xpNeed = Math.floor(state.xpNeed * 1.18 + 12);
+      ping("Wave " + state.wave + "!");
+      // small heal on wave up
+      player.hp = Math.min(player.maxHp, player.hp + 12);
+    }
+
+    // spawn enemies (increasing rate)
+    const targetEnemies = 3 + Math.floor(state.wave*0.8);
+    state.spawnTimer -= dt;
+    if (enemies.length < targetEnemies && state.spawnTimer <= 0) {
+      state.spawnTimer = Math.max(0.25, 1.1 - state.wave*0.04);
+      spawnEnemy();
+      if (Math.random() < 0.12) spawnEnemy();
+    }
+
+    // spawn powerups
+    state.powerTimer -= dt;
+    if (state.powerTimer <= 0) {
+      state.powerTimer = 6.5 + Math.random()*3.5;
+      if (powerups.length < 2) spawnPowerup();
+    }
+
+    // lose condition
+    if (player.hp <= 0) {
+      state.gameOver = true;
+      ping("Game Over — press Enter to restart");
+    }
+
+    // message timer
+    state.messageTimer = Math.max(0, state.messageTimer - dt);
+
+    // update UI
+    elPoints.textContent = String(state.points);
+    elWave.textContent = String(state.wave);
+    elKills.textContent = String(state.kills);
+
+    hpBar.style.width = (100 * clamp(player.hp / player.maxHp, 0, 1)).toFixed(1) + "%";
+    xpBar.style.width = (100 * clamp(state.xp / state.xpNeed, 0, 1)).toFixed(1) + "%";
+
+    syncShopButtons();
+  }
+
+  // ---------- Render ----------
+  function render(dt) {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+
+    // subtle ground
+    ctx.clearRect(0,0,w,h);
+    ctx.globalAlpha = 1;
+
+    // vignette-ish overlays
+    ctx.fillStyle = "rgba(0,0,0,0.20)";
+    ctx.fillRect(0,0,w,h);
+
+    // obstacles
+    for (const o of obstacles) {
+      if (o.kind === "tree") drawTreeObstacle(o);
+    }
+
+    // powerups
+    for (const p of powerups) drawPowerup(p);
+
+    // bullets
+    for (const b of bullets) drawBullet(b);
+
+    // enemies
+    for (const e of enemies) {
+      const facing = (player.x - e.x) >= 0 ? 1 : -1;
+      drawStick(e.x, e.y, facing, 1, false, e.hp / e.maxHp);
+    }
+
+    // player (with shield ring)
+    drawStick(player.x, player.y, player.facing, 1, true, player.hp / player.maxHp);
+
+    if (abilities.shield.active > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.25 + 0.2*Math.sin(performance.now()/120);
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, 26, 0, Math.PI*2);
+      ctx.strokeStyle = "rgba(140,210,255,0.9)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // punch arc indicator
+    if (player.punchT > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(player.x + player.facing*18, player.y+4, 18, 0, Math.PI*2);
+      ctx.strokeStyle = "rgba(220,240,255,0.9)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // particles
+    drawParticles(dt);
+
+    // HUD overlay (canvas)
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "12px ui-monospace, monospace";
+    ctx.textBaseline = "top";
+    ctx.fillText("FPS: " + Math.round(1/Math.max(0.0001,dt)), 10, 10);
+
+    // cooldowns
+    const cdLines = [];
+    if (abilities.dash.owned) cdLines.push(`F Dash: ${abilities.dash.t.toFixed(1)}s`);
+    if (abilities.tree.owned) cdLines.push(`R Tree: ${abilities.tree.t.toFixed(1)}s`);
+    if (abilities.blast.owned) cdLines.push(`Q Blast: ${abilities.blast.t.toFixed(1)}s`);
+    if (abilities.shield.owned) cdLines.push(`E Shield: ${abilities.shield.t.toFixed(1)}s`);
+    if (cdLines.length) {
+      ctx.globalAlpha = 0.85;
+      ctx.fillText(cdLines.join("  |  "), 10, 28);
+    }
+
+    // message
+    if (state.messageTimer > 0) {
+      ctx.globalAlpha = clamp(state.messageTimer/1.2, 0, 1);
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(10, 52, Math.min(520, 14 + ctx.measureText(state.message).width), 26);
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.fillText(state.message, 18, 58);
+    }
+
+    // game over overlay
+    if (state.gameOver) {
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0,0,w,h);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.font = "28px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("GAME OVER", w/2, h/2 - 24);
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillText("Press Enter to restart", w/2, h/2 + 10);
+      ctx.textAlign = "left";
+    }
+
+    ctx.restore();
+  }
+
+  // ---------- Main Loop ----------
+  function loop(t) {
+    const now = t * 0.001;
+    const dt = clamp(now - state.lastTime, 0, 0.033);
+    state.lastTime = now;
+
+    update(dt);
+    render(dt);
+
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Boot ----------
+  resize();
+  resetGame();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
